@@ -1,0 +1,212 @@
+package tile;
+
+import main.GamePanel;
+
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+
+public class TileManager {
+
+    GamePanel gp;
+    public Tile[] tile;
+    public int[][] mapTileNum;
+
+    public enum MapName { WORLD, CAVE }
+    public MapName currentMap = MapName.WORLD;
+
+    private boolean fading      = false;
+    private boolean fadingIn    = false;
+    private float   fadeAlpha   = 0f;
+    private String  nextMapPath = null;
+    private int[]   spawnPos    = null;
+
+    public TileManager(GamePanel gp) {
+        this.gp = gp;
+        tile = new Tile[10];
+        getTileImage();
+        loadMap("/maps/world.txt");
+    }
+
+    public void getTileImage() {
+        try {
+            tile[0] = new Tile();
+            tile[0].image = ImageIO.read(getClass().getResourceAsStream("/tiles/grass.png"));
+
+            tile[1] = new Tile();
+            tile[1].image = ImageIO.read(getClass().getResourceAsStream("/tiles/sand.png"));
+
+            tile[2] = new Tile();
+            tile[2].image = ImageIO.read(getClass().getResourceAsStream("/tiles/tree.png"));
+            tile[2].collision = true;
+
+            tile[3] = new Tile();
+            tile[3].image = ImageIO.read(getClass().getResourceAsStream("/tiles/water.png"));
+            tile[3].collision = true;
+
+            tile[4] = new Tile();
+            tile[4].image = ImageIO.read(getClass().getResourceAsStream("/tiles/earth.png"));
+
+            tile[5] = new Tile();
+            tile[5].image = ImageIO.read(getClass().getResourceAsStream("/tiles/wall.png"));
+            tile[5].collision = true;
+
+            tile[6] = new Tile();
+            tile[6].image = ImageIO.read(getClass().getResourceAsStream("/tiles/grass.png"));
+            // 6 = castle floor placeholder — swap to castle_floor.png when art ready
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // -----------------------------------------------
+    // MAP LOADING
+    // -----------------------------------------------
+    public void loadMap(String filePath) {
+        int cols, rows;
+        if (filePath.contains("cave")) {
+            cols = 40; rows = 60;
+            currentMap = MapName.CAVE;
+            gp.maxWorldColCurrent = 40;
+            gp.maxWorldRowCurrent = 60;
+        } else {
+            cols = 120; rows = 140;
+            currentMap = MapName.WORLD;
+            gp.maxWorldColCurrent = 120;
+            gp.maxWorldRowCurrent = 140;
+        }
+
+        mapTileNum = new int[cols][rows];
+
+        try {
+            InputStream is = getClass().getResourceAsStream(filePath);
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            int row = 0;
+            while (row < rows) {
+                String line = br.readLine();
+                if (line == null) break;
+                String[] numbers = line.trim().split(" ");
+                for (int col = 0; col < cols && col < numbers.length; col++) {
+                    try {
+                        mapTileNum[col][row] = Integer.parseInt(numbers[col].trim());
+                    } catch (NumberFormatException e) {
+                        mapTileNum[col][row] = 0;
+                    }
+                }
+                row++;
+            }
+            br.close();
+            System.out.println("Map loaded: " + filePath + " (" + cols + "x" + rows + ")");
+
+            // Spawn cave enemies only when cave loads
+            if (filePath.contains("cave")) {
+                gp.assetSetter.setCaveEnemies();
+            }
+
+        } catch (Exception e) {
+            System.out.println("Map load error: " + e.getMessage());
+        }
+    }
+
+    // -----------------------------------------------
+    // SAFE TILE SOLID CHECK — used by CollisionChecker
+    // Never throws ArrayIndexOutOfBounds
+    // -----------------------------------------------
+    public boolean isSolid(int col, int row) {
+        col = Math.max(0, Math.min(col, gp.maxWorldColCurrent - 1));
+        row = Math.max(0, Math.min(row, gp.maxWorldRowCurrent - 1));
+        int tileNum = mapTileNum[col][row];
+        if (tileNum < 0 || tileNum >= tile.length || tile[tileNum] == null) return false;
+        return tile[tileNum].collision;
+    }
+
+    // -----------------------------------------------
+    // TRANSITIONS
+    // -----------------------------------------------
+    public void transitionToCave() {
+        if (fading) return;
+        fading = true; fadingIn = false; fadeAlpha = 0f;
+        nextMapPath = "/maps/cave.txt";
+        spawnPos = new int[]{ 19 * gp.tileSize, 2 * gp.tileSize };
+    }
+
+    public void transitionToWorld() {
+        if (fading) return;
+        fading = true; fadingIn = false; fadeAlpha = 0f;
+        nextMapPath = "/maps/world.txt";
+        spawnPos = new int[]{ 59 * gp.tileSize, 134 * gp.tileSize };
+    }
+
+    public void updateTransition() {
+        if (!fading) return;
+        if (!fadingIn) {
+            fadeAlpha += 0.05f;
+            if (fadeAlpha >= 1f) {
+                fadeAlpha = 1f;
+                loadMap(nextMapPath);
+                gp.player.worldX = spawnPos[0];
+                gp.player.worldY = spawnPos[1];
+                fadingIn = true;
+            }
+        } else {
+            fadeAlpha -= 0.05f;
+            if (fadeAlpha <= 0f) {
+                fadeAlpha = 0f;
+                fading = false;
+                fadingIn = false;
+            }
+        }
+    }
+
+    public void drawTransitionOverlay(Graphics2D g2) {
+        if (fadeAlpha <= 0f) return;
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, fadeAlpha));
+        g2.setColor(Color.black);
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+    }
+
+    public boolean isTransitioning() { return fading; }
+
+    // -----------------------------------------------
+    // DRAW
+    // -----------------------------------------------
+    public void draw(Graphics2D g2) {
+        int camX = getCameraX();
+        int camY = getCameraY();
+
+        for (int worldRow = 0; worldRow < gp.maxWorldRowCurrent; worldRow++) {
+            for (int worldCol = 0; worldCol < gp.maxWorldColCurrent; worldCol++) {
+                int tileNum = mapTileNum[worldCol][worldRow];
+                int screenX = worldCol * gp.tileSize - camX;
+                int screenY = worldRow * gp.tileSize - camY;
+
+                if (screenX + gp.tileSize > 0 && screenX < gp.screenWidth &&
+                        screenY + gp.tileSize > 0 && screenY < gp.screenHeight) {
+                    if (tileNum >= 0 && tileNum < tile.length && tile[tileNum] != null) {
+                        g2.drawImage(tile[tileNum].image, screenX, screenY, gp.tileSize, gp.tileSize, null);
+                    }
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------
+    // CAMERA
+    // -----------------------------------------------
+    public int getCameraX() {
+        int mapW = gp.maxWorldColCurrent * gp.tileSize;
+        int camX = gp.player.worldX - gp.screenWidth / 2;
+        return Math.max(0, Math.min(camX, Math.max(0, mapW - gp.screenWidth)));
+    }
+
+    public int getCameraY() {
+        int mapH = gp.maxWorldRowCurrent * gp.tileSize;
+        int camY = gp.player.worldY - gp.screenHeight / 2;
+        return Math.max(0, Math.min(camY, Math.max(0, mapH - gp.screenHeight)));
+    }
+}

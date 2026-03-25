@@ -1,16 +1,22 @@
-# Godot 4+ specific ignores
-.godot/
-.nomedia
+# IntelliJ
+.idea/
+*.iml
+out/
 
-# Godot-specific ignores
-.import/
-export.cfg
-export_credentials.cfg
+# Java
+*.class
+*.log
+*.jar
+*.war
+*.ear
 
-# Imported translations (automatically generated from CSV files)
-*.translation
+# Maven
+target/
 
-# Mono-specific ignores
-.mono/
-data_*/
-mono_crash.*.json
+# Gradle
+.gradle/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
