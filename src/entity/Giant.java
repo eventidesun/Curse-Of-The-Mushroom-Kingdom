@@ -13,46 +13,49 @@ public class Giant extends Entity {
     GamePanel gp;
 
     BufferedImage idle1, idle2;
+    BufferedImage attack1, attack2, attack3;
 
-    // Heart weak point — only takes damage when attacked from above
-    private Rectangle heartArea; // relative to giant's world position
-    private boolean heartVisible = true;
+    private Rectangle heartArea;
 
-    private int actionTimer    = 0;
-    private int attackTimer    = 0;
-    private int attackCooldown = 120; // 2 seconds between stomps
-    private int chaseRange     = 8;
+    private int actionTimer = 0;
+    private int attackTimer = 0;
+    private int attackCooldown = 120;
+    private int chaseRange = 8;
+
+    private boolean attacking = false;
+    private int attackFrame = 0;
+    private int attackAnimTimer = 0;
 
     private boolean hasDropped = false;
-
-    // Stomp knockback
-    private int knockbackTimer = 0;
 
     public Giant(GamePanel gp) {
         this.gp = gp;
 
-        maxHealth    = 20;
-        health       = 20;
-        speed        = 1; // giant is slow
-        attackPower  = 5; // 2.5 hearts per stomp — very dangerous
+        maxHealth = 20;
+        health = maxHealth;
+        speed = 1;
+        attackPower = 5;
         invincibleMax = 90;
 
-        // Giant is 32x32 sprite = 128x128 on screen
         solidArea = new Rectangle(16, 16, 96, 96);
         solidAreaDefaultX = solidArea.x;
         solidAreaDefaultY = solidArea.y;
 
-        // Heart weak point — center of giant's chest area
         heartArea = new Rectangle(48, 20, 32, 32);
 
         direction = "down";
+
         loadSprites();
     }
 
     private void loadSprites() {
-        // Placeholder: boy sprite scaled up — swap to giant_idle_1.png
         idle1 = loadImage("/player/boy_down_1.png");
         idle2 = loadImage("/player/boy_down_2.png");
+
+        // placeholder attack (replace later)
+        attack1 = loadImage("/player/boy_left_1.png");
+        attack2 = loadImage("/player/boy_left_2.png");
+        attack3 = loadImage("/player/boy_left_1.png");
     }
 
     private BufferedImage loadImage(String path) {
@@ -76,17 +79,15 @@ public class Giant extends Entity {
         }
 
         if (attackTimer > 0) attackTimer--;
-        if (knockbackTimer > 0) knockbackTimer--;
 
         int distX = Math.abs(gp.player.worldX - worldX) / gp.tileSize;
         int distY = Math.abs(gp.player.worldY - worldY) / gp.tileSize;
-        int dist  = distX + distY;
+        int dist = distX + distY;
 
-        if (dist <= 2) {
-            // STOMP — big AoE attack
-            if (attackTimer == 0) {
-                stomp();
-            }
+        if (attacking) {
+            runAttackAnimation();
+        } else if (dist <= 2) {
+            startAttack();
         } else if (dist <= chaseRange) {
             chasePlayer();
         } else {
@@ -100,15 +101,41 @@ public class Giant extends Entity {
         }
     }
 
-    private void stomp() {
-        attackTimer = attackCooldown;
-        gp.playSE(2); // stomp SFX
-        gp.screenShake(20); // big shake
+    private void startAttack() {
+        if (attackTimer == 0) {
+            attacking = true;
+            attackFrame = 0;
+            attackAnimTimer = 0;
+        }
+    }
 
-        // Check if player is within stomp radius (3 tiles)
-        int distX = Math.abs(gp.player.worldX - worldX);
-        int distY = Math.abs(gp.player.worldY - worldY);
-        if (distX < gp.tileSize * 3 && distY < gp.tileSize * 3) {
+    private void runAttackAnimation() {
+        attackAnimTimer++;
+
+        if (attackAnimTimer > 12) {
+            attackFrame++;
+            attackAnimTimer = 0;
+        }
+
+        // stomp hit frame
+        if (attackFrame == 1) {
+            stomp();
+        }
+
+        if (attackFrame > 2) {
+            attacking = false;
+            attackTimer = attackCooldown;
+        }
+    }
+
+    private void stomp() {
+        gp.playSE(2);
+        gp.screenShake(20);
+
+        int dx = Math.abs(gp.player.worldX - worldX);
+        int dy = Math.abs(gp.player.worldY - worldY);
+
+        if (dx < gp.tileSize * 3 && dy < gp.tileSize * 3) {
             gp.player.takeDamage(attackPower);
         }
     }
@@ -116,79 +143,85 @@ public class Giant extends Entity {
     private void chasePlayer() {
         int px = gp.player.worldX;
         int py = gp.player.worldY;
+
         if (Math.abs(py - worldY) > Math.abs(px - worldX)) {
             direction = py < worldY ? "up" : "down";
         } else {
             direction = px < worldX ? "left" : "right";
         }
-        collisionOn = false;
-        gp.collisionChecker.checkTile(this);
-        if (!collisionOn) {
-            switch (direction) {
-                case "up"    -> worldY -= speed;
-                case "down"  -> worldY += speed;
-                case "left"  -> worldX -= speed;
-                case "right" -> worldX += speed;
-            }
-        }
+
+        move();
     }
 
     private void patrol() {
         actionTimer++;
+
         if (actionTimer >= 200) {
             actionTimer = 0;
             int rand = (int)(Math.random() * 4);
             direction = switch (rand) {
-                case 0 -> "up"; case 1 -> "down";
-                case 2 -> "left"; default -> "right";
+                case 0 -> "up";
+                case 1 -> "down";
+                case 2 -> "left";
+                default -> "right";
             };
         }
+
+        move();
+    }
+
+    private void move() {
         collisionOn = false;
         gp.collisionChecker.checkTile(this);
+
         if (!collisionOn) {
             switch (direction) {
-                case "up"    -> worldY -= speed;
-                case "down"  -> worldY += speed;
-                case "left"  -> worldX -= speed;
+                case "up" -> worldY -= speed;
+                case "down" -> worldY += speed;
+                case "left" -> worldX -= speed;
                 case "right" -> worldX += speed;
             }
         }
     }
 
     // -----------------------------------------------
-    // TAKE DAMAGE — only when hit from above (heart weak point)
+    // DAMAGE — only from ABOVE
     // -----------------------------------------------
     public void takeDamage(int amount, String playerDirection) {
-        if (invincible) return;
+        if (invincible || !alive) return;
 
-        // Must be attacking downward AND player must be above the giant
         boolean fromAbove = playerDirection.equals("down") &&
                 gp.player.worldY < worldY;
 
         if (!fromAbove) {
-            // Show hint message — player needs to attack heart from above
-            gp.ui.showMessage("Aim for the heart! Attack from above!");
+            gp.ui.showMessage("Aim for the heart!");
             return;
         }
 
         health -= amount;
         invincible = true;
         invincibleTimer = 0;
+
         gp.playSE(2);
 
-        if (health <= 0) die();
+        if (health <= 0) {
+            health = 0;
+            die();
+        }
     }
 
     private void die() {
         alive = false;
         gp.screenShake(30);
+
         if (!hasDropped) {
             hasDropped = true;
+
             for (int i = 0; i < gp.object.length; i++) {
                 if (gp.object[i] == null) {
                     Tiara_Object tiara = new Tiara_Object();
-                    tiara.worldX = worldX + gp.tileSize / 2;
-                    tiara.worldY = worldY + gp.tileSize / 2;
+                    tiara.worldX = worldX;
+                    tiara.worldY = worldY;
                     gp.object[i] = tiara;
                     break;
                 }
@@ -214,40 +247,50 @@ public class Giant extends Entity {
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
         }
 
-        // Giant is 2x2 tiles = 128x128 on screen
-        int drawSize = gp.tileSize * 2;
+        int size = gp.tileSize * 2;
 
-        if (idle1 != null) {
-            g2.drawImage(spriteNum == 1 ? idle1 : idle2,
-                    screenX, screenY, drawSize, drawSize, null);
+        BufferedImage frame;
+        if (attacking) {
+            frame = switch (attackFrame) {
+                case 0 -> attack1;
+                case 1 -> attack2;
+                default -> attack3;
+            };
         } else {
-            g2.setColor(new Color(80, 60, 40));
-            g2.fillRect(screenX, screenY, drawSize, drawSize);
-            g2.setColor(Color.white);
-            g2.setFont(new Font("Courier New", Font.BOLD, 14));
-            g2.drawString("GIANT", screenX + 20, screenY + 64);
+            frame = (spriteNum == 1) ? idle1 : idle2;
         }
 
-        // Draw heart weak point on giant's chest — always visible
-        int heartScreenX = screenX + heartArea.x;
-        int heartScreenY = screenY + heartArea.y;
-        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+        if (frame != null) {
+            g2.drawImage(frame, screenX, screenY, size, size, null);
+        } else {
+            g2.setColor(new Color(80, 60, 40));
+            g2.fillRect(screenX, screenY, size, size);
+        }
+
+        // Heart weak point
+        int hx = screenX + heartArea.x;
+        int hy = screenY + heartArea.y;
+
         g2.setColor(new Color(220, 50, 50, 200));
-        g2.fillOval(heartScreenX, heartScreenY, heartArea.width, heartArea.height);
-        g2.setColor(new Color(255, 100, 100));
-        g2.setStroke(new BasicStroke(2));
-        g2.drawOval(heartScreenX, heartScreenY, heartArea.width, heartArea.height);
+        g2.fillOval(hx, hy, heartArea.width, heartArea.height);
+
+        g2.setColor(Color.RED);
+        g2.drawOval(hx, hy, heartArea.width, heartArea.height);
 
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
-        drawHealthBar(g2, screenX, screenY - 14, drawSize);
+
+        drawHealthBar(g2, screenX, screenY - 14, size);
     }
 
     private void drawHealthBar(Graphics2D g2, int x, int y, int width) {
         int fillW = (int)((double) health / maxHealth * width);
+
         g2.setColor(new Color(40, 40, 40, 180));
         g2.fillRoundRect(x, y, width, 8, 4, 4);
+
         g2.setColor(new Color(220, 60, 60));
         g2.fillRoundRect(x, y, fillW, 8, 4, 4);
+
         g2.setColor(new Color(255, 255, 255, 60));
         g2.drawRoundRect(x, y, width, 8, 4, 4);
     }

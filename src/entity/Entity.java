@@ -31,4 +31,28 @@ public class Entity {
     public boolean invincible    = false;
     public int invincibleTimer   = 0;
     public int invincibleMax     = 60; // 1 second
+
+    public void takeDamage(int damage) {
+
+        if (!invincible && alive) {
+            health -= damage;
+            invincible = true;
+            invincibleTimer = 0;
+
+            if (health <= 0) {
+                health = 0;
+                alive = false;
+            }
+        }
+    }
+
+    public void updateInvincibility() {
+        if (invincible) {
+            invincibleTimer++;
+            if (invincibleTimer > invincibleMax) {
+                invincible = false;
+                invincibleTimer = 0;
+            }
+        }
+    }
 }

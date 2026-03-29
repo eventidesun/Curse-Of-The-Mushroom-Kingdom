@@ -37,10 +37,10 @@ public class TileManager {
             tile[0].image = ImageIO.read(getClass().getResourceAsStream("/tiles/grass.png"));
 
             tile[1] = new Tile();
-            tile[1].image = ImageIO.read(getClass().getResourceAsStream("/tiles/sand.png"));
+            tile[1].image = ImageIO.read(getClass().getResourceAsStream("/tiles/grass_dark_patch.png"));
 
             tile[2] = new Tile();
-            tile[2].image = ImageIO.read(getClass().getResourceAsStream("/tiles/tree.png"));
+            tile[2].image = ImageIO.read(getClass().getResourceAsStream("/tiles/bush.png"));
             tile[2].collision = true;
 
             tile[3] = new Tile();
@@ -55,7 +55,7 @@ public class TileManager {
             tile[5].collision = true;
 
             tile[6] = new Tile();
-            tile[6].image = ImageIO.read(getClass().getResourceAsStream("/tiles/grass.png"));
+            tile[6].image = ImageIO.read(getClass().getResourceAsStream("/tiles/stone_path.png"));
             // 6 = castle floor placeholder — swap to castle_floor.png when art ready
 
         } catch (IOException e) {

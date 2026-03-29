@@ -9,8 +9,7 @@ public class Tiara_Object extends SuperObject {
         name      = "Tiara";
         collision = false;
 
-        // Placeholder: use boots.png — swap to tiara.png when art ready
-        image = loadImage("/objects/boots.png");
+        image = loadImage("/objects/tiara.png");
     }
 
     @Override

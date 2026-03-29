@@ -9,11 +9,11 @@ import java.awt.*;
 
 public class GamePanel extends JPanel implements Runnable {
 
-    final int originalTileSize    = 16;
-    final int scale               = 4;
-    public final int tileSize     = originalTileSize * scale;
+    final int originalTileSize = 16;
+    final int scale = 4;
+    public final int tileSize = originalTileSize * scale;
 
-    Dimension screenSize          = Toolkit.getDefaultToolkit().getScreenSize();
+    Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
     public final int screenWidth  = (int) screenSize.getWidth();
     public final int screenHeight = (int) screenSize.getHeight();
     public final int maxScreenCol = screenWidth  / tileSize;
@@ -31,20 +31,20 @@ public class GamePanel extends JPanel implements Runnable {
 
     public boolean puzzleAfterDialogue = false;
 
-    private int shakeTimer     = 0;
+    private int shakeTimer = 0;
     private int shakeMagnitude = 0;
 
-    public TileManager tileManager           = new TileManager(this);
-    public KeyHandler keyH                   = new KeyHandler();
-    public Sound music                       = new Sound();
-    public Sound se                          = new Sound();
+    public TileManager tileManager = new TileManager(this);
+    public KeyHandler keyH = new KeyHandler();
+    public Sound music = new Sound();
+    public Sound se = new Sound();
     public CollisionChecker collisionChecker = new CollisionChecker(this);
-    public AssetSetter assetSetter           = new AssetSetter(this);
-    public UI ui                             = new UI(this);
-    public DialogueManager dialogueManager   = new DialogueManager(this);
-    public CutsceneManager cutsceneManager   = new CutsceneManager(this);
-    public PuzzleScene puzzleScene           = new PuzzleScene(this);
-    public EndingScene endingScene           = new EndingScene(this);
+    public AssetSetter assetSetter = new AssetSetter(this);
+    public UI ui = new UI(this);
+    public DialogueManager dialogueManager = new DialogueManager(this);
+    public CutsceneManager cutsceneManager = new CutsceneManager(this);
+    public PuzzleScene puzzleScene = new PuzzleScene(this);
+    public EndingScene endingScene = new EndingScene(this);
 
     Thread gameThread;
 
@@ -68,15 +68,10 @@ public class GamePanel extends JPanel implements Runnable {
         assetSetter.setObject();
         assetSetter.setEnemies();
 
-        // Player position for when overworld starts after cutscene
         player.worldX = 59 * tileSize;
         player.worldY = 12 * tileSize;
 
-        // START CUTSCENE — press F1 to skip during testing
-        // To skip to overworld directly, comment line below and uncomment the next:
         cutsceneManager.startScene(CutsceneManager.Scene.INTRO_CASTLE);
-        // gameState = GameState.OVERWORLD;
-
         playMusic(0);
     }
 
@@ -101,7 +96,6 @@ public class GamePanel extends JPanel implements Runnable {
     public void update() {
         if (shakeTimer > 0) shakeTimer--;
 
-        // F1 — skip to overworld
         if (keyH.debugPressed) {
             keyH.debugPressed = false;
             gameState = GameState.OVERWORLD;
@@ -197,7 +191,7 @@ public class GamePanel extends JPanel implements Runnable {
     private void checkDragonDefeated() {
         if (dragon != null && !dragon.alive && player.hasNecklace) {
             if (object[20] == null) {
-                object[20]        = new object.Orb_Object();
+                object[20] = new object.Orb_Object();
                 object[20].worldX = dragon.worldX;
                 object[20].worldY = dragon.worldY - tileSize * 2;
             }
