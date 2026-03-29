@@ -20,12 +20,15 @@ public class Player extends Entity {
     public boolean hasRing  = false;
     public boolean hasTiara = false;
 
+    // Shield
     public int shieldLevel       = 1;
     public int shieldStrength    = 10;
     public int maxShieldStrength = 10;
 
+    // Diamonds / easter eggs
     public int eggsFound = 0;
 
+    // Potions
     public int      potionsHeld    = 0;
     private boolean potionConsumed = false;
 
@@ -75,6 +78,10 @@ public class Player extends Entity {
         health = Math.min(health + amount, maxHealth);
     }
 
+    // -----------------------------------------------
+    // RESPAWN — back to castle gate, full health,
+    // no cutscene, quest items kept
+    // -----------------------------------------------
     public void respawn() {
         health         = maxHealth;
         shieldStrength = maxShieldStrength;
@@ -97,14 +104,15 @@ public class Player extends Entity {
     }
 
     private void loadSprites() {
-        walkDown1  = load("/player/boy_down_1.png");
-        walkDown2  = load("/player/boy_down_2.png");
-        walkUp1    = load("/player/boy_up_1.png");
-        walkUp2    = load("/player/boy_up_2.png");
-        walkLeft1  = load("/player/boy_left_1.png");
-        walkLeft2  = load("/player/boy_left_2.png");
-        walkRight1 = load("/player/boy_right_1.png");
-        walkRight2 = load("/player/boy_right_2.png");
+        // King uses his own sprite — single idle frame since no walk animation yet
+        walkDown1  = load("/characters/king.png");
+        walkDown2  = load("/characters/king.png");
+        walkUp1    = load("/characters/king.png");
+        walkUp2    = load("/characters/king.png");
+        walkLeft1  = load("/characters/king.png");
+        walkLeft2  = load("/characters/king.png");
+        walkRight1 = load("/characters/king.png");
+        walkRight2 = load("/characters/king.png");
 
         attackDown1  = walkDown1;  attackDown2  = walkDown2;  attackDown3  = walkDown1;
         attackUp1    = walkUp1;    attackUp2    = walkUp2;    attackUp3    = walkUp1;
@@ -117,6 +125,9 @@ public class Player extends Entity {
         catch (Exception e) { System.out.println("Missing player sprite: " + path); return null; }
     }
 
+    // -----------------------------------------------
+    // UPDATE
+    // -----------------------------------------------
     public void update() {
 
         // Start attack
@@ -188,6 +199,9 @@ public class Player extends Entity {
         }
     }
 
+    // -----------------------------------------------
+    // ATTACK HIT DETECTION
+    // -----------------------------------------------
     private void checkAttackHit() {
         Rectangle box = new Rectangle();
         box.width = box.height = gp.tileSize;
@@ -225,6 +239,9 @@ public class Player extends Entity {
         );
     }
 
+    // -----------------------------------------------
+    // OBJECT INTERACTION
+    // -----------------------------------------------
     private void interactObject(int index) {
         if (index == 999) return;
         if (keyH.interactPressed) {
@@ -235,6 +252,9 @@ public class Player extends Entity {
         }
     }
 
+    // -----------------------------------------------
+    // TAKE DAMAGE
+    // -----------------------------------------------
     @Override
     public void takeDamage(int amount) {
         if (invincible) return;
@@ -250,12 +270,16 @@ public class Player extends Entity {
         invincibleTimer = 0;
         gp.playSE(3);
 
+        // Death — respawn at castle, no cutscene
         if (health == 0) {
             gp.ui.showMessage("The king has fallen... but his quest is not over.");
             respawn();
         }
     }
 
+    // -----------------------------------------------
+    // DRAW — flicker only when damaged, never during attack
+    // -----------------------------------------------
     public void draw(Graphics2D g2) {
         if (invincible && !attacking && invincibleTimer % 10 < 5) return;
 

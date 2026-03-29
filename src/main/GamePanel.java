@@ -26,15 +26,13 @@ public class GamePanel extends JPanel implements Runnable {
 
     int FPS = 60;
 
-    public enum GameState { CUTSCENE, DREAM, OVERWORLD, BATTLE, DIALOGUE, PUZZLE, ENDING }
+    // PUZZLE removed — no orb, no necklace
+    public enum GameState { CUTSCENE, DREAM, OVERWORLD, BATTLE, DIALOGUE, ENDING }
     public GameState gameState = GameState.CUTSCENE;
-
-//    public boolean puzzleAfterDialogue = false;
 
     private int shakeTimer     = 0;
     private int shakeMagnitude = 0;
 
-    // One-shot guard so "Something holds the dragon back..." only shows once
     private boolean dragonHintShown = false;
 
     public TileManager tileManager           = new TileManager(this);
@@ -46,7 +44,6 @@ public class GamePanel extends JPanel implements Runnable {
     public UI ui                             = new UI(this);
     public DialogueManager dialogueManager   = new DialogueManager(this);
     public CutsceneManager cutsceneManager   = new CutsceneManager(this);
-//    public PuzzleScene puzzleScene           = new PuzzleScene(this);
     public EndingScene endingScene           = new EndingScene(this);
 
     Thread gameThread;
@@ -99,11 +96,10 @@ public class GamePanel extends JPanel implements Runnable {
     public void update() {
         if (shakeTimer > 0) shakeTimer--;
 
-        // F1 — skip to overworld (testing)
+        // F1 — skip to ending for testing
         if (keyH.debugPressed) {
             keyH.debugPressed = false;
-            gameState = GameState.OVERWORLD;
-            playMusic(1);
+            gameState = GameState.ENDING;
         }
 
         tileManager.updateTransition();
@@ -119,14 +115,12 @@ public class GamePanel extends JPanel implements Runnable {
                     player.update();
                     updateEnemies();
                     checkPlayerAttack();
-                    checkDragonFightStart(); // gates the dragon behind all 3 quest items
-//                    checkDragonDefeated();
+                    checkDragonFightStart();
                     checkCaveExit();
                 }
             }
             case DIALOGUE -> dialogueManager.update();
-//            case PUZZLE   -> puzzleScene.update();
-            case ENDING   -> endingScene.update();
+            case ENDING   -> { endingScene.update(); dialogueManager.update(); }
         }
     }
 
@@ -174,13 +168,12 @@ public class GamePanel extends JPanel implements Runnable {
             playSE(6);
             ui.showMessage("The dragon awakens!");
         } else {
-            // Show hint once when player first enters dragon's presence
             if (!dragonHintShown) {
                 int dx = Math.abs(player.worldX - dragon.worldX) / tileSize;
                 int dy = Math.abs(player.worldY - dragon.worldY) / tileSize;
                 if (dx < 8 && dy < 8) {
                     dragonHintShown = true;
-                    ui.showMessage("The dragon ignores you. You need to recover your memories first.");
+                    ui.showMessage("The dragon ignores you. Recover your memories first.");
                 }
             }
         }
@@ -224,16 +217,6 @@ public class GamePanel extends JPanel implements Runnable {
         return inRange && inFront;
     }
 
-//    private void checkDragonDefeated() {
-//        if (dragon != null && !dragon.alive && player.hasNecklace) {
-//            if (object[20] == null) {
-//                object[20]        = new object.Orb_Object();
-//                object[20].worldX = dragon.worldX;
-//                object[20].worldY = dragon.worldY - tileSize * 2;
-//            }
-//        }
-//    }
-
     @Override
     public void paintComponent(Graphics graphics) {
         super.paintComponent(graphics);
@@ -251,7 +234,6 @@ public class GamePanel extends JPanel implements Runnable {
             case OVERWORLD, BATTLE, DIALOGUE -> {
                 tileManager.draw(g2); drawObjects(g2); drawEnemies(g2); player.draw(g2); ui.draw(g2);
             }
-//            case PUZZLE -> { tileManager.draw(g2); player.draw(g2); puzzleScene.draw(g2); ui.draw(g2); }
             case ENDING -> endingScene.draw(g2);
         }
 
@@ -276,11 +258,6 @@ public class GamePanel extends JPanel implements Runnable {
         dialogueManager.startDialogue(speaker, lines);
         gameState = GameState.DIALOGUE;
     }
-
-//    public void endDialogue() {
-//        if (puzzleAfterDialogue) { puzzleAfterDialogue = false; puzzleScene.resume(); }
-//        else gameState = GameState.OVERWORLD;
-//    }
 
     public void endDialogue() {
         gameState = GameState.OVERWORLD;

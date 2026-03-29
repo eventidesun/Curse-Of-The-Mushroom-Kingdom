@@ -16,7 +16,6 @@ public class Main {
         window.add(gamePanel);
         window.pack();
 
-        // Force true fullscreen using GraphicsDevice
         GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
         GraphicsDevice gd = ge.getDefaultScreenDevice();
 

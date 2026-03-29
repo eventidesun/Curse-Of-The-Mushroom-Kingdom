@@ -31,7 +31,6 @@ public class Dragon extends Entity {
     // Queen sprite drawn above dragon
     private BufferedImage queenSprite;
 
-    private boolean hasDropped   = false;
     public  boolean fightStarted = false;
 
     // Facing: -1 = left, +1 = right
@@ -60,7 +59,7 @@ public class Dragon extends Entity {
         fire1       = load("/enemies/dragon_fire1.png");
         fire2       = load("/enemies/dragon_fire2.png");
         fire3       = load("/enemies/dragon_fire3.png");
-        queenSprite = load("/player/boy_down_2.png"); // swap to queen sprite when ready
+        queenSprite = load("/characters/queen.png");
     }
 
     private BufferedImage load(String path) {
@@ -185,10 +184,13 @@ public class Dragon extends Entity {
     private void die() {
         alive = false;
         gp.screenShake(40);
-        // Trigger queen-falls and the ending cutscene
+        // Go straight to ending — no necklace, no puzzle
         gp.cutsceneManager.startScene(main.CutsceneManager.Scene.ENDING);
     }
 
+    // -----------------------------------------------
+    // DRAW
+    // -----------------------------------------------
     public void draw(Graphics2D g2) {
         if (!alive) return;
 

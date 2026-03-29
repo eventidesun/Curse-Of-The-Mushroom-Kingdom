@@ -92,9 +92,9 @@ public class CutsceneManager {
     }
 
     private void loadImages() {
-        kingSprite  = loadImg("/player/boy_down_1.png");
-        queenSprite = loadImg("/player/boy_down_2.png");
-        witchSprite = loadImg("/enemies/dragon_fire1.png");
+        kingSprite  = loadImg("/characters/king.png");
+        queenSprite = loadImg("/characters/queen.png");
+        witchSprite = loadImg("/characters/witch.png");
         dragon1     = loadImg("/enemies/dragon1.png");
         dragon2     = loadImg("/enemies/dragon2.png");
         dragon3     = loadImg("/enemies/dragon3.png");
@@ -108,9 +108,6 @@ public class CutsceneManager {
         catch (Exception e) { System.out.println("Cutscene img not found: " + path); return null; }
     }
 
-    // -----------------------------------------------
-    // DISSOLVE
-    // -----------------------------------------------
     private void dissolveToNext(Runnable onBlack) {
         if (dissolveState != DissolveState.NONE) return;
         dissolveState   = DissolveState.FADING_OUT;
@@ -133,7 +130,6 @@ public class CutsceneManager {
         }
     }
 
-    // start scene
     public void startScene(Scene scene) {
         currentScene        = scene;
         scenePhase          = 0;
@@ -219,17 +215,9 @@ public class CutsceneManager {
         }
     }
 
-    // -----------------------------------------------
-    // INTRO — 3 phases
-    // Phase 0: peaceful dialogue
-    // Phase 1: dragon flies in, grabs queen, exits,
-    //          then returns centre and speaks curse lines,
-    //          fires spell at king, then dissolves
-    // Phase 2: king alone, confused
-    // -----------------------------------------------
     private void updateIntro() {
 
-        // wait for peaceful dialogue
+        // Phase 0 — wait for peaceful dialogue
         if (scenePhase == 0 && !gp.dialogueManager.isActive()
                 && dissolveState == DissolveState.NONE) {
             scenePhase = 1;
@@ -239,7 +227,7 @@ public class CutsceneManager {
         if (scenePhase == 1) {
             dragonVisible = true;
 
-            // dragon flies in from right, grabs queen
+            // Step A: dragon flies in from right, grabs queen
             if (!dragonCarrying && !poofActive && !dragonReturned) {
                 dragonX -= 10;
                 if (darkenAlpha < 0.3f) darkenAlpha += 0.006f;
@@ -252,45 +240,55 @@ public class CutsceneManager {
                 }
             }
 
-            // dragon flies in from right, grabs queen
-            if (!dragonCarrying && !poofActive && !dragonReturned) {
-                dragonX -= 10;
-                if (darkenAlpha < 0.3f) darkenAlpha += 0.006f;
-                int queenX = gp.screenWidth / 2 + 40;
-                if (dragonX <= queenX + 60 && queenVisible) {
-                    shakeTimer = 40;
-                    poofActive = true; poofTimer = 0;
-                    poofX = queenX; poofY = gp.screenHeight / 2 - gp.tileSize / 2;
-                    gp.playSE(7); gp.stopMusic();
-                }
-            }
-
-            // dragon carries queen off screen right, then dissolves and returns centre
+            // Step B: dragon carries queen off screen right
             if (dragonCarrying && !dragonReturned) {
                 dragonX += 12;
+                // When dragon is fully off screen, dissolve then return centre
                 if (dragonX > gp.screenWidth + 200 && dissolveState == DissolveState.NONE) {
                     dissolveToNext(() -> {
+                        // Dragon returns to centre stage — face the king
                         dragonReturned    = true;
                         dragonCarrying    = false;
                         queenVisible      = false;
                         darkenAlpha       = 0f;
                         dragonCentreTimer = 0;
-                        dragonX           = gp.screenWidth / 2 + 40;
-                        dragonY           = gp.screenHeight / 2 - gp.tileSize * 2;
+                        dragonX = gp.screenWidth / 2 + 40;
+                        dragonY = gp.screenHeight / 2 - gp.tileSize * 2;
                     });
                 }
             }
 
-            // Dragon back centre, speaks curse lines then dissolves
-            if (dragonReturned) {
+            // Step C: dragon back centre, speaks curse lines
+            if (dragonReturned && !spellActive && kingCurseTimer == 0) {
                 dragonCentreTimer++;
-                // Start dialogue after short pause
+                // Wait a beat then start dragon's dialogue
                 if (dragonCentreTimer == 60 && !gp.dialogueManager.isActive()) {
                     gp.dialogueManager.startDialogue("dragon", DRAGON_CURSE_LINES);
                 }
-                // Once dialogue done, dissolve to king alone
-                if (dragonCentreTimer > 60 && !gp.dialogueManager.isActive()
-                        && dissolveState == DissolveState.NONE) {
+                // Once curse dialogue done, fire the spell
+                if (dragonCentreTimer > 60 && !gp.dialogueManager.isActive()) {
+                    spellActive = true;
+                    spellBeamX  = dragonX;
+                }
+            }
+
+            // Step D: spell travels to king
+            if (spellActive) {
+                spellBeamX -= 15;
+                int kingX = gp.screenWidth / 2 - 120;
+                if (spellBeamX <= kingX + gp.tileSize) {
+                    spellActive    = false;
+                    kingCurseTimer = 60;
+                    shakeTimer     = 20;
+                    gp.playSE(7);
+                }
+            }
+
+            // Step E: after curse hits, dragon exits and dissolves to phase 2
+            if (kingCurseTimer > 0) {
+                kingCurseTimer--;
+                dragonX += 8; // dragon drifts right while king is cursed
+                if (kingCurseTimer == 0 && dissolveState == DissolveState.NONE) {
                     dissolveToNext(() -> {
                         dragonVisible = false;
                         scenePhase    = 2;
@@ -314,7 +312,6 @@ public class CutsceneManager {
         }
     }
 
-    // the dream
     private void updateDream() {
         if (scenePhase == 0 && !narratorDone && !gp.dialogueManager.isActive()
                 && dissolveState == DissolveState.NONE) {
@@ -384,6 +381,7 @@ public class CutsceneManager {
         // Dialogue on top
         gp.ui.drawDialogueBox(g2);
 
+        // Dissolve overlay — always the very top layer
         if (dissolveState != DissolveState.NONE && dissolveAlpha > 0f) {
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.min(1f, dissolveAlpha)));
             g2.setColor(Color.black);
@@ -392,30 +390,30 @@ public class CutsceneManager {
         }
     }
 
-    // bedroom scene
     private void drawBedroom(Graphics2D g2) {
         int ts = gp.tileSize;
 
+        // Floor
         for (int col=0; col<=gp.screenWidth/ts; col++)
             for (int row=0; row<=gp.screenHeight/ts; row++) {
                 if (tileFloor!=null) g2.drawImage(tileFloor,col*ts,row*ts,ts,ts,null);
                 else { g2.setColor(new Color(160,130,90)); g2.fillRect(col*ts,row*ts,ts,ts); }
             }
+        // Wall top rows
         for (int col=0; col<=gp.screenWidth/ts; col++)
             for (int row=0; row<3; row++) {
                 if (tileWall!=null) g2.drawImage(tileWall,col*ts,row*ts,ts,ts,null);
                 else { g2.setColor(new Color(100,100,120)); g2.fillRect(col*ts,row*ts,ts,ts); }
             }
 
-        // King
-        int kingX=gp.screenWidth/2-120, kingY=gp.screenHeight/2-ts/2;
-        if (kingSprite!=null) g2.drawImage(kingSprite,kingX,kingY,ts,ts,null);
+        int kingX=gp.screenWidth/2-120, kingY=gp.screenHeight/2-ts;
+        if (kingSprite!=null) g2.drawImage(kingSprite,kingX,kingY,ts*2,ts*2,null);
         else { g2.setColor(new Color(80,140,80)); g2.fillRect(kingX,kingY,ts,ts); }
 
         // Queen
         if (queenVisible) {
-            int qx=gp.screenWidth/2+40, qy=gp.screenHeight/2-ts/2;
-            if (queenSprite!=null) g2.drawImage(queenSprite,qx,qy,ts,ts,null);
+            int qx=gp.screenWidth/2+40, qy=gp.screenHeight/2-ts;
+            if (queenSprite!=null) g2.drawImage(queenSprite,qx,qy,ts*2,ts*2,null);
             else { g2.setColor(new Color(200,100,160)); g2.fillRect(qx,qy,ts,ts); }
         }
 
@@ -428,12 +426,11 @@ public class CutsceneManager {
                 case 0 -> dragon1; case 1 -> dragon2; default -> dragon3;
             };
 
-            // Queen held above dragon when carrying
             if (dragonCarrying && queenSprite != null)
-                g2.drawImage(queenSprite, dragonX, drawY - ts, ts, ts, null);
+                g2.drawImage(queenSprite, dragonX, drawY - ts, ts*2, ts*2, null);
 
             if (frame != null)
-                g2.drawImage(frame, dragonX + dw, drawY, -dw, dh, null); // flip horizontally
+                g2.drawImage(frame, dragonX + dw, drawY, -dw, dh, null);
             else {
                 g2.setColor(new Color(160,30,30));
                 g2.fillRect(dragonX, drawY, dw, dh);
@@ -444,21 +441,33 @@ public class CutsceneManager {
         if (poofActive) drawPoof(g2, poofX+ts/2, poofY+ts/2, poofTimer, POOF_DURATION);
     }
 
-    // dream scene
     private void drawDream(Graphics2D g2) {
         g2.setColor(new Color(10, 5, 30));
         g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
 
-        int kx=gp.screenWidth/2-32, ky=gp.screenHeight-250;
-        if (kingSprite!=null) g2.drawImage(kingSprite,kx,ky,gp.tileSize,gp.tileSize,null);
-        else { g2.setColor(new Color(80,140,80)); g2.fillRect(kx,ky,gp.tileSize,gp.tileSize); }
-
-        if (scenePhase == 1) {
-            float bob = (float)(Math.sin(phaseTimer * 0.05) * 8);
-            int wx = gp.screenWidth/2-32, wy = (int)(gp.screenHeight/2-80+bob);
-            if (witchSprite!=null) g2.drawImage(witchSprite,wx,wy,gp.tileSize,gp.tileSize,null);
-            else { g2.setColor(new Color(180,120,255)); g2.fillRect(wx,wy,gp.tileSize,gp.tileSize); }
+        g2.setColor(new Color(255, 255, 255, 100));
+        long seed = 42;
+        for (int i = 0; i < 40; i++) {
+            seed = seed * 6364136223846793005L + 1442695040888963407L;
+            int sx = (int)(Math.abs(seed % gp.screenWidth));
+            seed = seed * 6364136223846793005L + 1442695040888963407L;
+            int sy = (int)(Math.abs(seed % (gp.screenHeight / 2)));
+            g2.fillOval(sx, sy, (i % 3 == 0) ? 3 : 2, (i % 3 == 0) ? 3 : 2);
         }
+
+        int kx = gp.screenWidth/2 - gp.tileSize, ky = gp.screenHeight - 280;
+        if (kingSprite!=null) g2.drawImage(kingSprite, kx, ky, gp.tileSize*2, gp.tileSize*2, null);
+        else { g2.setColor(new Color(80,140,80)); g2.fillRect(kx, ky, gp.tileSize, gp.tileSize); }
+
+        float witchAlpha = (scenePhase == 0) ? 0.6f : 1.0f;
+        float bob = (float)(Math.sin(phaseTimer * 0.05) * 8);
+        int wx = gp.screenWidth/2 - gp.tileSize;
+        int wy = (int)(gp.screenHeight/2 - 120 + bob);
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, witchAlpha));
+        if (witchSprite!=null) g2.drawImage(witchSprite, wx, wy, gp.tileSize*2, gp.tileSize*2, null);
+        else { g2.setColor(new Color(180,120,255)); g2.fillRect(wx, wy, gp.tileSize*2, gp.tileSize*2); }
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
     }
 
     private void drawPoof(Graphics2D g2, int cx, int cy, int timer, int duration) {
@@ -473,50 +482,26 @@ public class CutsceneManager {
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
     }
 
-    private void drawSpellBeam(Graphics2D g2, int x, int y) {
-        for (int i=0; i<8; i++) {
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (8-i)/8f*0.8f));
-            g2.setColor(new Color(180,0,255));
-            g2.fillRoundRect(x+i*20, y-6, 30-i*3, 12, 6, 6);
-        }
-        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
-        g2.setColor(new Color(240,180,255)); g2.fillOval(x-12,y-12,24,24);
-        g2.setColor(new Color(200,100,255)); g2.fillOval(x-8,y-8,16,16);
-    }
-
-    // flashback
     private void drawFlashback(Graphics2D g2, String item) {
         // White base
         g2.setColor(Color.white);
         g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
 
-        // Subtle warm wash over white
+        // Subtle warm wash
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.12f));
         g2.setColor(new Color(255, 220, 160));
         g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
 
-        // Queen silhouette centre
-        int qx = gp.screenWidth/2 - 32, qy = gp.screenHeight/2 - 80;
-        if (queenSprite != null)
-            g2.drawImage(queenSprite, qx, qy, gp.tileSize, gp.tileSize, null);
-        else {
-            g2.setColor(new Color(200, 100, 160));
-            g2.fillRect(qx, qy, gp.tileSize, gp.tileSize);
-        }
+        int ts = gp.tileSize;
+        int qx = gp.screenWidth/2 - ts, qy = gp.screenHeight/2 - ts;
+        if (queenSprite!=null) g2.drawImage(queenSprite, qx, qy, ts*2, ts*2, null);
+        else { g2.setColor(new Color(255,200,220)); g2.fillRect(qx, qy, ts, ts); }
 
-        // Label — dark text readable on white
         g2.setFont(new Font("Courier New", Font.BOLD, 18));
         g2.setColor(new Color(80, 55, 30));
-        String lbl = switch (item) {
-            case "rose"  -> "A rose...";
-            case "ring"  -> "A ring...";
-            default      -> "A crown...";
-        };
-        g2.drawString(lbl,
-                gp.screenWidth/2 - g2.getFontMetrics().stringWidth(lbl)/2,
-                qy + gp.tileSize + 50
-        );
+        String lbl = switch(item){ case "rose"->"A rose..."; case "ring"->"A ring..."; default->"A crown..."; };
+        g2.drawString(lbl, gp.screenWidth/2 - g2.getFontMetrics().stringWidth(lbl)/2, qy + ts*2 + 30);
     }
 
     private void drawEnding(Graphics2D g2) {

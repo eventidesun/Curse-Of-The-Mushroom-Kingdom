@@ -46,7 +46,7 @@ public class UI {
     }
 
     private void loadImages() {
-        heartFull   = loadImg("/ui/heart_full.png");
+        heartFull   = loadImg("/ui/heart.png");
         heartHalf   = loadImg("/ui/heart_half.png");
         heartEmpty  = loadImg("/ui/heart_empty.png");
         slotEmpty   = loadImg("/ui/slot_empty.png");

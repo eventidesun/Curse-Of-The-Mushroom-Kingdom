@@ -11,11 +11,6 @@ public class CollisionChecker {
         this.gp = gp;
     }
 
-    // -----------------------------------------------
-    // TILE COLLISION
-    // All tile lookups go through isSolid() which
-    // clamps coordinates — never throws OutOfBounds
-    // -----------------------------------------------
     public void checkTile(Entity entity) {
         int entityLeftX   = entity.worldX + entity.solidArea.x;
         int entityRightX  = entity.worldX + entity.solidArea.x + entity.solidArea.width;
@@ -55,10 +50,6 @@ public class CollisionChecker {
         }
     }
 
-    // -----------------------------------------------
-    // OBJECT COLLISION
-    // Returns index of hit object, 999 if none
-    // -----------------------------------------------
     public int checkObject(Entity entity, boolean isPlayer) {
         int index = 999;
         for (int i = 0; i < gp.object.length; i++) {
@@ -90,10 +81,6 @@ public class CollisionChecker {
         return index;
     }
 
-    // -----------------------------------------------
-    // ENTITY-TO-ENTITY COLLISION
-    // Returns index of hit target, 999 if none
-    // -----------------------------------------------
     public int checkEntity(Entity entity, Entity[] targets) {
         int index = 999;
         for (int i = 0; i < targets.length; i++) {
