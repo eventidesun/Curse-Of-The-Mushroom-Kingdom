@@ -221,9 +221,6 @@ public class TileManager {
         }
     }
 
-    // -----------------------------------------------
-    // CAMERA
-    // -----------------------------------------------
     public int getCameraX() {
         int mapW = gp.maxWorldColCurrent * gp.tileSize;
         int camX = gp.player.worldX - gp.screenWidth / 2;

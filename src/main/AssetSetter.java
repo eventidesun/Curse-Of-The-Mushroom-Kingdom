@@ -9,9 +9,6 @@ public class AssetSetter {
 
     public AssetSetter(GamePanel gp) { this.gp = gp; }
 
-    // -----------------------------------------------
-    // OBJECTS — all on open grass/path tiles, never wall
-    // -----------------------------------------------
     public void setObject() {
 
         // Healing chests — on stone path, reachable by player
@@ -64,16 +61,8 @@ public class AssetSetter {
         gp.object[slot] = o;
     }
 
-    // -----------------------------------------------
-    // WORLD ENEMIES — all placed on open grass/path,
-    // NOT on wall tiles (tile 8)
-    // Forest zone = rows 27-63, cols 20-100 (away from walls cols 0-2, 117-119)
-    // Bridge zone = rows 65-78, on stone bridge cols 56-63
-    // Wasteland  = rows 82-118
-    // -----------------------------------------------
     public void setEnemies() {
 
-        // --- GOBLINS (forest, rows 30-60, grass cols) ---
         gp.goblins[0] = goblin(50, 33, true);   // leader — drops rose
         gp.goblins[1] = goblin(67, 36, false);
         gp.goblins[2] = goblin(44, 48, false);

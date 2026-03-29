@@ -3,20 +3,23 @@
 *.iml
 out/
 
-# Java
+# Java build outputs
 *.class
 *.log
 *.jar
 *.war
 *.ear
 
-# Maven
-target/
-
-# Gradle
-.gradle/
+# Build systems
 build/
+target/
+.gradle/
 
-# OS files
+# Archives (DO NOT upload builds)
+*.zip
+
+# Mac system files
 .DS_Store
-Thumbs.db
+
+# Generated metadata
+META-INF/

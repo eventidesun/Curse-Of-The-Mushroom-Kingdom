@@ -217,7 +217,7 @@ public class CutsceneManager {
 
     private void updateIntro() {
 
-        // Phase 0 — wait for peaceful dialogue
+        // wait for peaceful dialogue
         if (scenePhase == 0 && !gp.dialogueManager.isActive()
                 && dissolveState == DissolveState.NONE) {
             scenePhase = 1;
@@ -227,7 +227,7 @@ public class CutsceneManager {
         if (scenePhase == 1) {
             dragonVisible = true;
 
-            // Step A: dragon flies in from right, grabs queen
+            // dragon flies in from right, grabs queen
             if (!dragonCarrying && !poofActive && !dragonReturned) {
                 dragonX -= 10;
                 if (darkenAlpha < 0.3f) darkenAlpha += 0.006f;
@@ -240,7 +240,7 @@ public class CutsceneManager {
                 }
             }
 
-            // Step B: dragon carries queen off screen right
+            // dragon carries queen off screen right
             if (dragonCarrying && !dragonReturned) {
                 dragonX += 12;
                 // When dragon is fully off screen, dissolve then return centre
@@ -258,7 +258,7 @@ public class CutsceneManager {
                 }
             }
 
-            // Step C: dragon back centre, speaks curse lines
+            // dragon back centre, speaks curse lines
             if (dragonReturned && !spellActive && kingCurseTimer == 0) {
                 dragonCentreTimer++;
                 // Wait a beat then start dragon's dialogue
@@ -272,7 +272,7 @@ public class CutsceneManager {
                 }
             }
 
-            // Step D: spell travels to king
+            // spell travels to king
             if (spellActive) {
                 spellBeamX -= 15;
                 int kingX = gp.screenWidth / 2 - 120;
@@ -284,7 +284,7 @@ public class CutsceneManager {
                 }
             }
 
-            // Step E: after curse hits, dragon exits and dissolves to phase 2
+            // after curse hits, dragon exits and dissolves to phase 2
             if (kingCurseTimer > 0) {
                 kingCurseTimer--;
                 dragonX += 8; // dragon drifts right while king is cursed
@@ -483,11 +483,9 @@ public class CutsceneManager {
     }
 
     private void drawFlashback(Graphics2D g2, String item) {
-        // White base
         g2.setColor(Color.white);
         g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
 
-        // Subtle warm wash
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.12f));
         g2.setColor(new Color(255, 220, 160));
         g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
