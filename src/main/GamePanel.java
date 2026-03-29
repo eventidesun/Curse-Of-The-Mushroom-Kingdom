@@ -29,10 +29,13 @@ public class GamePanel extends JPanel implements Runnable {
     public enum GameState { CUTSCENE, DREAM, OVERWORLD, BATTLE, DIALOGUE, PUZZLE, ENDING }
     public GameState gameState = GameState.CUTSCENE;
 
-    public boolean puzzleAfterDialogue = false;
+//    public boolean puzzleAfterDialogue = false;
 
     private int shakeTimer     = 0;
     private int shakeMagnitude = 0;
+
+    // One-shot guard so "Something holds the dragon back..." only shows once
+    private boolean dragonHintShown = false;
 
     public TileManager tileManager           = new TileManager(this);
     public KeyHandler keyH                   = new KeyHandler();
@@ -43,7 +46,7 @@ public class GamePanel extends JPanel implements Runnable {
     public UI ui                             = new UI(this);
     public DialogueManager dialogueManager   = new DialogueManager(this);
     public CutsceneManager cutsceneManager   = new CutsceneManager(this);
-    public PuzzleScene puzzleScene           = new PuzzleScene(this);
+//    public PuzzleScene puzzleScene           = new PuzzleScene(this);
     public EndingScene endingScene           = new EndingScene(this);
 
     Thread gameThread;
@@ -68,15 +71,10 @@ public class GamePanel extends JPanel implements Runnable {
         assetSetter.setObject();
         assetSetter.setEnemies();
 
-        // Player position for when overworld starts after cutscene
         player.worldX = 59 * tileSize;
         player.worldY = 12 * tileSize;
 
-        // START CUTSCENE — press F1 to skip during testing
-        // To skip to overworld directly, comment line below and uncomment the next:
         cutsceneManager.startScene(CutsceneManager.Scene.INTRO_CASTLE);
-        // gameState = GameState.OVERWORLD;
-
         playMusic(0);
     }
 
@@ -101,7 +99,7 @@ public class GamePanel extends JPanel implements Runnable {
     public void update() {
         if (shakeTimer > 0) shakeTimer--;
 
-        // F1 — skip to overworld
+        // F1 — skip to overworld (testing)
         if (keyH.debugPressed) {
             keyH.debugPressed = false;
             gameState = GameState.OVERWORLD;
@@ -114,19 +112,20 @@ public class GamePanel extends JPanel implements Runnable {
         switch (gameState) {
             case CUTSCENE, DREAM -> {
                 cutsceneManager.update();
-                dialogueManager.update(); // typewriter ticks during cutscenes
+                dialogueManager.update();
             }
             case OVERWORLD, BATTLE -> {
                 if (!tileManager.isTransitioning()) {
                     player.update();
                     updateEnemies();
                     checkPlayerAttack();
-                    checkDragonDefeated();
+                    checkDragonFightStart(); // gates the dragon behind all 3 quest items
+//                    checkDragonDefeated();
                     checkCaveExit();
                 }
             }
             case DIALOGUE -> dialogueManager.update();
-            case PUZZLE   -> puzzleScene.update();
+//            case PUZZLE   -> puzzleScene.update();
             case ENDING   -> endingScene.update();
         }
     }
@@ -155,15 +154,36 @@ public class GamePanel extends JPanel implements Runnable {
         for (int i = 0; i < goblins.length; i++) {
             if (goblins[i] == null) continue;
             if (goblins[i].alive) goblins[i].update();
-            else goblins[i] = null; // remove dead goblin so it stops drawing
+            else goblins[i] = null;
         }
         for (int i = 0; i < trolls.length; i++) {
             if (trolls[i] == null) continue;
             if (trolls[i].alive) trolls[i].update();
-            else trolls[i] = null; // remove dead troll
+            else trolls[i] = null;
         }
         if (giant  != null) { if (giant.alive)  giant.update();  else giant  = null; }
         if (dragon != null) { if (dragon.alive)  dragon.update(); else dragon = null; }
+    }
+
+    private void checkDragonFightStart() {
+        if (dragon == null || dragon.fightStarted) return;
+
+        if (player.hasRose && player.hasRing && player.hasTiara) {
+            dragon.fightStarted = true;
+            dragonHintShown     = false;
+            playSE(6);
+            ui.showMessage("The dragon awakens!");
+        } else {
+            // Show hint once when player first enters dragon's presence
+            if (!dragonHintShown) {
+                int dx = Math.abs(player.worldX - dragon.worldX) / tileSize;
+                int dy = Math.abs(player.worldY - dragon.worldY) / tileSize;
+                if (dx < 8 && dy < 8) {
+                    dragonHintShown = true;
+                    ui.showMessage("The dragon ignores you. You need to recover your memories first.");
+                }
+            }
+        }
     }
 
     private void checkPlayerAttack() {
@@ -174,11 +194,13 @@ public class GamePanel extends JPanel implements Runnable {
         int py = player.worldY + tileSize / 2;
         for (Goblin g : goblins) {
             if (g == null || !g.alive) continue;
-            if (hitCheck(px, py, g.worldX + tileSize/2, g.worldY + tileSize/2, range)) g.takeDamage(player.attackPower);
+            if (hitCheck(px, py, g.worldX + tileSize/2, g.worldY + tileSize/2, range))
+                g.takeDamage(player.attackPower);
         }
         for (Troll t : trolls) {
             if (t == null || !t.alive) continue;
-            if (hitCheck(px, py, t.worldX + tileSize/2, t.worldY + tileSize/2, range)) t.takeDamage(player.attackPower);
+            if (hitCheck(px, py, t.worldX + tileSize/2, t.worldY + tileSize/2, range))
+                t.takeDamage(player.attackPower);
         }
         if (giant != null && giant.alive)
             if (hitCheck(px, py, giant.worldX + tileSize, giant.worldY + tileSize, range * 2))
@@ -202,15 +224,15 @@ public class GamePanel extends JPanel implements Runnable {
         return inRange && inFront;
     }
 
-    private void checkDragonDefeated() {
-        if (dragon != null && !dragon.alive && player.hasNecklace) {
-            if (object[20] == null) {
-                object[20]        = new object.Orb_Object();
-                object[20].worldX = dragon.worldX;
-                object[20].worldY = dragon.worldY - tileSize * 2;
-            }
-        }
-    }
+//    private void checkDragonDefeated() {
+//        if (dragon != null && !dragon.alive && player.hasNecklace) {
+//            if (object[20] == null) {
+//                object[20]        = new object.Orb_Object();
+//                object[20].worldX = dragon.worldX;
+//                object[20].worldY = dragon.worldY - tileSize * 2;
+//            }
+//        }
+//    }
 
     @Override
     public void paintComponent(Graphics graphics) {
@@ -229,7 +251,7 @@ public class GamePanel extends JPanel implements Runnable {
             case OVERWORLD, BATTLE, DIALOGUE -> {
                 tileManager.draw(g2); drawObjects(g2); drawEnemies(g2); player.draw(g2); ui.draw(g2);
             }
-            case PUZZLE -> { tileManager.draw(g2); player.draw(g2); puzzleScene.draw(g2); ui.draw(g2); }
+//            case PUZZLE -> { tileManager.draw(g2); player.draw(g2); puzzleScene.draw(g2); ui.draw(g2); }
             case ENDING -> endingScene.draw(g2);
         }
 
@@ -237,7 +259,9 @@ public class GamePanel extends JPanel implements Runnable {
         g2.dispose();
     }
 
-    private void drawObjects(Graphics2D g2) { for (SuperObject o : object) if (o != null) o.draw(g2, this); }
+    private void drawObjects(Graphics2D g2) {
+        for (SuperObject o : object) if (o != null) o.draw(g2, this);
+    }
 
     private void drawEnemies(Graphics2D g2) {
         for (Goblin g : goblins) if (g != null) g.draw(g2);
@@ -253,9 +277,13 @@ public class GamePanel extends JPanel implements Runnable {
         gameState = GameState.DIALOGUE;
     }
 
+//    public void endDialogue() {
+//        if (puzzleAfterDialogue) { puzzleAfterDialogue = false; puzzleScene.resume(); }
+//        else gameState = GameState.OVERWORLD;
+//    }
+
     public void endDialogue() {
-        if (puzzleAfterDialogue) { puzzleAfterDialogue = false; puzzleScene.resume(); }
-        else gameState = GameState.OVERWORLD;
+        gameState = GameState.OVERWORLD;
     }
 
     public void playMusic(int i) { music.setFile(i); music.play(); music.loop(); }

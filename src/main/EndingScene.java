@@ -10,14 +10,12 @@ public class EndingScene {
 
     private BufferedImage kingSprite, queenSprite;
 
-    // -----------------------------------------------
-    // PHASES
+    // The phases:
     // 0 — queen falls from above, king runs to catch
     // 1 — dialogue (from CutsceneManager.ENDING)
     // 2 — heart grows from centre
     // 3 — fade to warm red
-    // 4 — THE END
-    // -----------------------------------------------
+    // 4 — the end
     private int   phase     = 0;
     private int   timer     = 0;
 
@@ -99,7 +97,7 @@ public class EndingScene {
                 }
             }
             case 1 -> {
-                // Wait for ENDING cutscene dialogue to finish
+                // Wait for ending cutscene dialogue to finish
                 // CutsceneManager.ENDING calls gp.gameState = ENDING when done
                 // but we've already done that — wait for sceneActive = false
                 if (!gp.cutsceneManager.isActive()) {
@@ -126,7 +124,7 @@ public class EndingScene {
         int cy = gp.screenHeight / 2;
         int ts = gp.tileSize;
 
-        // ---- Phase 0 & 1: reunion scene ----
+        // the reunion scene
         if (phase <= 1) {
             // Warm sunset background
             g2.setColor(new Color(255, 210, 170));
@@ -170,7 +168,7 @@ public class EndingScene {
             }
         }
 
-        // ---- Phase 2+: growing heart ----
+        // growing heart - drawn in code
         if (phase >= 2) {
             g2.setColor(new Color(200, 40, 60));
             g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
@@ -178,7 +176,7 @@ public class EndingScene {
             drawHeart(g2, cx - (int)(heartSize/2), cy - (int)(heartSize/2), (int) heartSize);
         }
 
-        // ---- Phase 3+: fade overlay ----
+        //  fade overlay
         if (phase >= 3) {
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.min(1f, fadeAlpha)));
             g2.setColor(new Color(160, 20, 40));
@@ -186,7 +184,7 @@ public class EndingScene {
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
         }
 
-        // ---- Phase 4: THE END ----
+        // the end
         if (phase >= 4) {
             g2.setFont(new Font("Courier New", Font.BOLD, 72));
             g2.setColor(new Color(255, 230, 220));

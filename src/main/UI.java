@@ -15,10 +15,11 @@ public class UI {
 
     BufferedImage heartFull, heartHalf, heartEmpty;
     BufferedImage slotEmpty, slotFilled;
-    BufferedImage roseImg, ringImg, tiaraImg, necklaceImg;
+    BufferedImage roseImg, ringImg, tiaraImg;  // 3 quest items — no necklace
     BufferedImage shieldWood, shieldIron, shieldMagic;
     BufferedImage swordIcon;
     BufferedImage eggIcon;
+    BufferedImage potionImg;
     BufferedImage witchBtn;
     BufferedImage dialogueBox;
     BufferedImage witchPortrait;
@@ -53,12 +54,13 @@ public class UI {
         roseImg     = loadImg("/objects/rose.png");
         ringImg     = loadImg("/objects/ring.png");
         tiaraImg    = loadImg("/objects/tiara.png");
-        necklaceImg = loadImg("/objects/necklace.png");
+        // no necklace slot
         shieldWood  = loadImg("/ui/shield_wood.png");
         shieldIron  = loadImg("/ui/shield_iron.png");
         shieldMagic = loadImg("/ui/shield_magic.png");
         swordIcon   = loadImg("/ui/sword_icon.png");
         eggIcon     = loadImg("/ui/egg_icon.png");
+        potionImg   = loadImg("/objects/potion_red.png");
         witchBtn    = loadImg("/ui/witch_button.png");
         dialogueBox   = loadImg("/ui/dialogue_box.png");
         witchPortrait = loadImg("/characters/witch_portrait.png");
@@ -80,24 +82,19 @@ public class UI {
     }
 
     public void draw(Graphics2D g2) {
-        bounceTimer++; // always ticking — smooth sine wave
+        bounceTimer++;
         switch (gp.gameState) {
             case OVERWORLD, BATTLE -> {
                 drawHearts(g2); drawItemSlots(g2);
                 drawEggCounter(g2); drawPotionCounter(g2);
-                drawCombatHUD(g2); drawWitchButton(g2);
+                drawCombatHUD(g2);
             }
             case DIALOGUE -> {
                 drawHearts(g2); drawItemSlots(g2);
                 drawPotionCounter(g2);
-                drawCombatHUD(g2); drawWitchButton(g2); drawDialogueBox(g2);
+                drawCombatHUD(g2); drawDialogueBox(g2);
             }
             case CUTSCENE, DREAM -> drawDialogueBox(g2);
-            case PUZZLE -> {
-                drawHearts(g2); drawItemSlots(g2);
-                drawPotionCounter(g2);
-                drawWitchButton(g2); drawDialogueBox(g2);
-            }
         }
         if (messageOn) drawMessage(g2);
     }
@@ -121,12 +118,11 @@ public class UI {
 
     private void drawItemSlots(Graphics2D g2) {
         int size = 28, gap = 6, startX = 16, startY = 52;
-        BufferedImage[] items = { roseImg, ringImg, tiaraImg, necklaceImg };
+        BufferedImage[] items = { roseImg, ringImg, tiaraImg };
         boolean[] collected   = {
-                gp.player.hasRose, gp.player.hasRing,
-                gp.player.hasTiara, gp.player.hasNecklace
+                gp.player.hasRose, gp.player.hasRing, gp.player.hasTiara
         };
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 3; i++) {
             int x = startX + i * (size + gap);
             if (collected[i]) {
                 if (slotFilled != null) g2.drawImage(slotFilled, x, startY, size, size, null);
@@ -137,8 +133,7 @@ public class UI {
                 }
                 if (items[i] != null) g2.drawImage(items[i], x+2, startY+2, size-4, size-4, null);
                 else {
-                    Color[] fb = { new Color(220,50,80), new Color(220,200,50),
-                            new Color(180,100,220), new Color(100,200,220) };
+                    Color[] fb = { new Color(220,50,80), new Color(220,200,50), new Color(180,100,220) };
                     g2.setColor(fb[i]); g2.fillOval(x+6, startY+6, size-12, size-12);
                 }
             } else {
@@ -163,30 +158,23 @@ public class UI {
     }
 
     private void drawPotionCounter(Graphics2D g2) {
-        // Potion bottle icon + count — top right, below witch button
         int size = 28;
         int x = gp.screenWidth - size - 16;
-        int y = 72; // just below witch button (which is at y=16, size=48)
+        int y = 72;
 
-        // Draw potion bottle
-        BufferedImage potionImg = loadImg("/objects/potion_red.png");
         if (potionImg != null) {
             g2.drawImage(potionImg, x, y, size, size, null);
         } else {
             g2.setColor(new Color(200, 60, 60, 200));
             g2.fillRoundRect(x, y, size, size, 8, 8);
-            g2.setColor(Color.white);
-            g2.setFont(pixelFont_16);
+            g2.setFont(pixelFont_16); g2.setColor(Color.white);
             g2.drawString("P", x + size/2 - 5, y + size/2 + 6);
         }
 
-        // Count badge
-        g2.setFont(pixelFont_16);
-        g2.setColor(Color.white);
+        g2.setFont(pixelFont_16); g2.setColor(Color.white);
         String count = "x" + gp.player.potionsHeld;
         g2.drawString(count, x - g2.getFontMetrics().stringWidth(count) - 6, y + size/2 + 6);
 
-        // "Press P" hint — only show if player has potions and is hurt
         if (gp.player.potionsHeld > 0 && gp.player.health < gp.player.maxHealth) {
             g2.setFont(new Font("Courier New", Font.PLAIN, 11));
             g2.setColor(new Color(255, 255, 200, 180));
@@ -233,66 +221,42 @@ public class UI {
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
     }
 
-    // dialogue box
-    // dialogue box
     public void drawDialogueBox(Graphics2D g2) {
         if (!gp.dialogueManager.isActive()) return;
-
-        int boxH = 160;
-        int boxY = gp.screenHeight - boxH;
+        int boxH = 160, boxY = gp.screenHeight - boxH;
 
         if (dialogueBox != null) {
             g2.drawImage(dialogueBox, 0, boxY, gp.screenWidth, boxH, null);
         } else {
-            g2.setColor(new Color(15,10,30,230));
-            g2.fillRect(0, boxY, gp.screenWidth, boxH);
-
-            g2.setColor(new Color(150,100,200));
-            g2.setStroke(new BasicStroke(2));
-            g2.drawRect(1, boxY+1, gp.screenWidth-2, boxH-2);
-            g2.setStroke(new BasicStroke(1));
+            g2.setColor(new Color(15,10,30,230)); g2.fillRect(0,boxY,gp.screenWidth,boxH);
+            g2.setColor(new Color(150,100,200)); g2.setStroke(new BasicStroke(2));
+            g2.drawRect(1,boxY+1,gp.screenWidth-2,boxH-2); g2.setStroke(new BasicStroke(1));
         }
 
-        g2.setFont(pixelFont_20);
-        g2.setColor(Color.white);
+        g2.setFont(pixelFont_20); g2.setColor(Color.white);
+        drawWrappedText(g2, gp.dialogueManager.getDisplayText(),
+                40, boxY+44, gp.screenWidth-80, 30);
 
-        // FULL WIDTH TEXT (no portrait offset)
-        drawWrappedText(
-                g2,
-                gp.dialogueManager.getDisplayText(),
-                40,                // left padding
-                boxY + 44,
-                gp.screenWidth - 80, // full width minus padding
-                30
-        );
-
-        // Advance arrow — bounces RIGHT, with drop shadow for depth
         if (gp.dialogueManager.isLineComplete()) {
-            // Smooth continuous bounce — moves right 5px and back
             float bounceSine = (float)(Math.sin(bounceTimer * 0.12));
             int bounceX = (int)(bounceSine * 5); // 5px horizontal travel
 
             int arrowW = 32;
             int arrowH = 32;
-            // Base position: bottom right of dialogue box, above bottom edge
             int baseX = gp.screenWidth - arrowW - 20;
             int baseY = boxY + boxH/2 - arrowH/2;
 
             if (advanceArrow != null) {
-                // Drop shadow — dark semi-transparent copy offset down-right
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.35f));
                 g2.drawImage(advanceArrow, baseX + bounceX + 4, baseY + 4, arrowW, arrowH, null);
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
-                // Real arrow
                 g2.drawImage(advanceArrow, baseX + bounceX, baseY, arrowW, arrowH, null);
             } else {
-                // Fallback: right-pointing arrow drawn in code, with shadow
                 int ax = baseX + bounceX;
                 int ay = baseY;
                 int[] arrowXpts = { ax,      ax,      ax + arrowW };
                 int[] arrowYpts = { ay,       ay + arrowH, ay + arrowH/2 };
 
-                // Shadow
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
                 g2.setColor(Color.black);
                 int[] sxpts = { ax+4,      ax+4,      ax + arrowW + 4 };
@@ -300,18 +264,15 @@ public class UI {
                 g2.fillPolygon(sxpts, sypts, 3);
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
 
-                // Main arrow — bright with highlight
                 g2.setColor(new Color(255, 220, 80));
                 g2.fillPolygon(arrowXpts, arrowYpts, 3);
 
-                // Highlight — lighter top-left edge for 3D feel
                 g2.setColor(new Color(255, 255, 180));
                 g2.setStroke(new BasicStroke(2));
                 g2.drawLine(ax, ay, ax, ay + arrowH);         // left edge
                 g2.drawLine(ax, ay, ax + arrowW, ay + arrowH/2); // top diagonal
                 g2.setStroke(new BasicStroke(1));
 
-                // Dark outline
                 g2.setColor(new Color(120, 80, 0));
                 g2.drawPolygon(arrowXpts, arrowYpts, 3);
             }

@@ -7,7 +7,7 @@ public class EasterEgg_Object extends SuperObject {
     public EasterEgg_Object() {
         name      = "Easter Egg";
         collision = false;
-        image     = loadImage("/objects/coin_bronze.png"); // diamond placeholder — swap when art ready
+        image     = loadImage("/objects/egg_icon.png"); // diamond placeholder — swap when art ready
     }
 
     @Override

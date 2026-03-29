@@ -85,7 +85,7 @@ public class TileManager {
         }
     }
 
-    // Load primary tile; fall back to secondary if not found
+    // fallback if first tile isn't found
     private java.awt.image.BufferedImage loadTileWithFallback(String primary, String fallback) {
         try {
             InputStream is = getClass().getResourceAsStream(primary);
@@ -100,9 +100,6 @@ public class TileManager {
         }
     }
 
-    // -----------------------------------------------
-    // MAP LOADING
-    // -----------------------------------------------
     public void loadMap(String filePath) {
         int cols, rows;
         if (filePath.contains("cave")) {
@@ -148,9 +145,6 @@ public class TileManager {
         }
     }
 
-    // -----------------------------------------------
-    // SAFE TILE SOLID CHECK
-    // -----------------------------------------------
     public boolean isSolid(int col, int row) {
         col = Math.max(0, Math.min(col, gp.maxWorldColCurrent - 1));
         row = Math.max(0, Math.min(row, gp.maxWorldRowCurrent - 1));
@@ -159,9 +153,6 @@ public class TileManager {
         return tile[tileNum].collision;
     }
 
-    // -----------------------------------------------
-    // TRANSITIONS
-    // -----------------------------------------------
     public void transitionToCave() {
         if (fading) return;
         fading = true; fadingIn = false; fadeAlpha = 0f;
