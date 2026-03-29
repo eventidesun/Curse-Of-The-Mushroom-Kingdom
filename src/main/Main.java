@@ -21,7 +21,7 @@ public class Main {
         GraphicsDevice gd = ge.getDefaultScreenDevice();
 
         if (gd.isFullScreenSupported()) {
-            gd.setFullScreenWindow(window); // true exclusive fullscreen
+            gd.setFullScreenWindow(window);
         } else {
             window.setExtendedState(JFrame.MAXIMIZED_BOTH);
         }

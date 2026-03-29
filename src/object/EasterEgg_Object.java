@@ -7,9 +7,7 @@ public class EasterEgg_Object extends SuperObject {
     public EasterEgg_Object() {
         name      = "Easter Egg";
         collision = false;
-
-        // Placeholder: use blueheart.png — swap to easter_egg.png when art ready
-        image = loadImage("/objects/blueheart.png");
+        image     = loadImage("/objects/coin_bronze.png"); // diamond placeholder — swap when art ready
     }
 
     @Override
@@ -17,13 +15,10 @@ public class EasterEgg_Object extends SuperObject {
         gp.player.eggsFound++;
         gp.object[index] = null;
 
-        // Boost shield strength
-        gp.player.shieldStrength = Math.min(
-                gp.player.shieldStrength + 5,
-                gp.player.maxShieldStrength
-        );
+        // Each egg permanently increases attack power
+        gp.player.attackPower++;
 
         gp.playSE(1);
-        gp.ui.showMessage("Easter egg found! (" + gp.player.eggsFound + "/5) Shield boosted!");
+        gp.ui.showMessage("Diamond found! Attack power up! (" + gp.player.eggsFound + "/5)");
     }
 }

@@ -11,42 +11,56 @@ public class Dragon extends Entity {
 
     GamePanel gp;
 
-    // ANIMATION
-    BufferedImage idle1, idle2, idle3;
-    BufferedImage fire1, fire2, fire3;
+    // -----------------------------------------------
+    // SPRITES — same dragon as cutscene, fire form in battle
+    // -----------------------------------------------
+    BufferedImage idle1, idle2, idle3;   // dragon1/2/3 — circling idle
+    BufferedImage fire1, fire2, fire3;   // dragon_fire1/2/3 — when breathing fire
 
-    // PHASE SYSTEM
-    public enum Phase { IDLE, FIRE_BREATH, TAIL_SWIPE, CHARGE }
+    // -----------------------------------------------
+    // PHASES
+    // IDLE    — drifts toward player slowly
+    // FIRE    — spits a fireball
+    // CHARGE  — quick dash toward player
+    // -----------------------------------------------
+    public enum Phase { IDLE, FIRE, CHARGE }
     private Phase currentPhase = Phase.IDLE;
+    private int   phaseTimer   = 0;
+    private int   attackCooldown = 0;
 
-    private int phaseTimer = 0;
-    private int phaseLength = 180;
-
-    private int attackCooldown = 0;
-
-    // FIRE
-    private int fireX, fireY;
+    // Fire projectile
     private boolean fireActive = false;
-    private int fireDirection = 1;
+    private float   fireX, fireY;
+    private int     fireDir   = 1;    // +1 = right, -1 = left
+    private float   fireSpeed = 8f;
 
-    // CHARGE
-    private boolean charging = false;
-    private int chargeTimer = 0;
+    // Charge
+    private boolean charging    = false;
+    private int     chargeTimer = 0;
 
-    private boolean hasDropped = false;
-    public boolean fightStarted = false;
+    // Queen visual — she's held above the dragon until it dies
+    private BufferedImage queenSprite;
+
+    // Defeat flag
+    private boolean hasDropped  = false;
+    public  boolean fightStarted = false;
+
+    // Direction flag for sprite flip
+    private int facing = -1; // -1 = left (facing king), +1 = right
 
     public Dragon(GamePanel gp) {
         this.gp = gp;
 
-        maxHealth = 30;
-        health = maxHealth;
+        // Balanced — not too hard for a jam game
+        maxHealth   = 20;
+        health      = maxHealth;
+        speed       = 1;
+        attackPower = 3;
+        invincibleMax = 60;
 
-        speed = 2;
-        attackPower = 4;
-        invincibleMax = 90;
-
-        solidArea = new Rectangle(24, 24, 144, 144);
+        solidArea = new Rectangle(16, 16, 160, 160);
+        solidAreaDefaultX = solidArea.x;
+        solidAreaDefaultY = solidArea.y;
 
         loadSprites();
     }
@@ -55,246 +69,235 @@ public class Dragon extends Entity {
         idle1 = load("/enemies/dragon1.png");
         idle2 = load("/enemies/dragon2.png");
         idle3 = load("/enemies/dragon3.png");
-
         fire1 = load("/enemies/dragon_fire1.png");
         fire2 = load("/enemies/dragon_fire2.png");
         fire3 = load("/enemies/dragon_fire3.png");
+        queenSprite = load("/player/boy_down_2.png"); // placeholder — swap to queen sprite when ready
     }
 
     private BufferedImage load(String path) {
         try {
-            return ImageIO.read(getClass().getResourceAsStream(path));
-        } catch (Exception e) {
-            System.out.println("Missing dragon sprite: " + path);
-            return null;
-        }
+            var is = getClass().getResourceAsStream(path);
+            if (is != null) return ImageIO.read(is);
+        } catch (Exception ignored) {}
+        System.out.println("Missing dragon sprite: " + path);
+        return null;
     }
 
+    // -----------------------------------------------
+    // UPDATE
+    // -----------------------------------------------
     public void update() {
         if (!alive || !fightStarted) return;
 
-        handleInvincibility();
-        if (attackCooldown > 0) attackCooldown--;
-
-        phaseTimer++;
-        if (phaseTimer >= phaseLength) {
-            phaseTimer = 0;
-            pickNextPhase();
-        }
-
-        facePlayer();
-
-        switch (currentPhase) {
-            case FIRE_BREATH -> updateFire();
-            case TAIL_SWIPE  -> updateTail();
-            case CHARGE      -> updateCharge();
-        }
-
-        if (fireActive) updateFireProjectile();
-
-        animate();
-    }
-
-    private void handleInvincibility() {
+        // Invincibility tick
         if (invincible) {
             invincibleTimer++;
-            if (invincibleTimer >= invincibleMax) {
-                invincible = false;
-                invincibleTimer = 0;
-            }
+            if (invincibleTimer >= invincibleMax) { invincible = false; invincibleTimer = 0; }
         }
-    }
+        if (attackCooldown > 0) attackCooldown--;
 
-    private void animate() {
+        // Face the player
+        facing = gp.player.worldX > worldX ? 1 : -1;
+
+        // Phase timer — rotate through phases every ~3 seconds
+        phaseTimer++;
+        if (phaseTimer >= 180) {
+            phaseTimer = 0;
+            pickPhase();
+        }
+
+        switch (currentPhase) {
+            case IDLE   -> drift();
+            case FIRE   -> doFire();
+            case CHARGE -> doCharge();
+        }
+
+        if (fireActive) moveFireball();
+
+        // Sprite animation
         spriteCounter++;
-        if (spriteCounter > 10) {
-            spriteNum = (spriteNum + 1) % 3;
-            spriteCounter = 0;
-        }
+        if (spriteCounter > 10) { spriteNum = (spriteNum + 1) % 3; spriteCounter = 0; }
     }
 
-    private void pickNextPhase() {
-        double hp = (double) health / maxHealth;
+    private void pickPhase() {
+        double hpFrac = (double) health / maxHealth;
         int roll = (int)(Math.random() * 3);
-
-        if (hp < 0.3) {
-            currentPhase = roll == 0 ? Phase.FIRE_BREATH : Phase.CHARGE;
-            phaseLength = 120;
+        // Below half health: no idle, faster rotation
+        if (hpFrac < 0.5) {
+            currentPhase = roll == 0 ? Phase.FIRE : Phase.CHARGE;
         } else {
             currentPhase = switch (roll) {
-                case 0 -> Phase.FIRE_BREATH;
-                case 1 -> Phase.TAIL_SWIPE;
-                default -> Phase.CHARGE;
+                case 0 -> Phase.FIRE;
+                case 1 -> Phase.CHARGE;
+                default -> Phase.IDLE;
             };
-            phaseLength = 180;
         }
     }
 
-    private void facePlayer() {
-        fireDirection = gp.player.worldX > worldX ? 1 : -1;
+    // Slow drift toward player — gentle threat presence
+    private void drift() {
+        int px = gp.player.worldX, py = gp.player.worldY;
+        int dx = px - worldX, dy = py - worldY;
+        double dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > gp.tileSize * 4) {
+            worldX += (int)(dx / dist * speed);
+            worldY += (int)(dy / dist * speed);
+        }
     }
 
-    private void updateFire() {
-        if (attackCooldown == 0) {
-            fireX = worldX + gp.tileSize;
-            fireY = worldY + gp.tileSize;
+    // Spit one fireball toward the player
+    private void doFire() {
+        if (attackCooldown == 0 && !fireActive) {
+            fireX = worldX + gp.tileSize * 1.5f;
+            fireY = worldY + gp.tileSize * 1.5f;
+            fireDir = facing;
             fireActive = true;
-            attackCooldown = 40;
+            attackCooldown = 90; // ~1.5s before another fireball
             gp.playSE(2);
         }
     }
 
-    private void updateFireProjectile() {
-        fireX += fireDirection * 10;
+    private void moveFireball() {
+        fireX += fireDir * fireSpeed;
 
-        int dx = Math.abs(gp.player.worldX - fireX);
-        int dy = Math.abs(gp.player.worldY - fireY);
-
-        if (dx < gp.tileSize && dy < gp.tileSize) {
-            gp.player.takeDamage(3);
+        // Hit player?
+        float dx = Math.abs(gp.player.worldX + gp.tileSize/2f - fireX);
+        float dy = Math.abs(gp.player.worldY + gp.tileSize/2f - fireY);
+        if (dx < gp.tileSize * 0.8f && dy < gp.tileSize * 0.8f) {
+            gp.player.takeDamage(attackPower);
             fireActive = false;
         }
 
-        if (fireX < 0 || fireX > gp.maxWorldCol * gp.tileSize) {
+        // Off screen
+        if (fireX < -gp.tileSize * 2 || fireX > (gp.maxWorldColCurrent + 2) * gp.tileSize)
             fireActive = false;
-        }
     }
 
-    private void updateTail() {
-        if (attackCooldown == 0) {
+    // Quick dash at player — telegraphed, stoppable
+    private void doCharge() {
+        if (!charging && attackCooldown == 0) {
+            charging    = true;
+            chargeTimer = 45; // charge lasts 0.75s
+        }
+        if (charging) {
+            chargeTimer--;
+            worldX += facing * 5;
+
+            // Hit player during charge?
             int dx = Math.abs(gp.player.worldX - worldX);
             int dy = Math.abs(gp.player.worldY - worldY);
-
-            if (dx < gp.tileSize * 3 && dy < gp.tileSize * 3) {
+            if (dx < gp.tileSize * 1.5f && dy < gp.tileSize * 1.5f) {
                 gp.player.takeDamage(attackPower);
                 gp.screenShake(15);
             }
-
-            attackCooldown = 90;
+            if (chargeTimer <= 0) { charging = false; attackCooldown = 120; }
         }
     }
 
-    private void updateCharge() {
-        if (!charging && attackCooldown == 0) {
-            charging = true;
-            chargeTimer = 60;
-        }
-
-        if (charging) {
-            chargeTimer--;
-
-            int speed = 6;
-
-            if (fireDirection == 1) worldX += speed;
-            else worldX -= speed;
-
-            int dx = Math.abs(gp.player.worldX - worldX);
-            int dy = Math.abs(gp.player.worldY - worldY);
-
-            if (dx < gp.tileSize && dy < gp.tileSize) {
-                gp.player.takeDamage(attackPower);
-                gp.screenShake(25);
-            }
-
-            if (chargeTimer <= 0) {
-                charging = false;
-                attackCooldown = 100;
-            }
-        }
-    }
-
+    // -----------------------------------------------
+    // TAKE DAMAGE
+    // -----------------------------------------------
+    @Override
     public void takeDamage(int amount) {
-        if (invincible || !fightStarted) return;
-
+        if (invincible || !alive || !fightStarted) return;
         health -= amount;
-        invincible = true;
+        invincible      = true;
         invincibleTimer = 0;
-
         gp.playSE(2);
-
-        if (health <= 0) die();
+        if (health <= 0) { health = 0; die(); }
     }
 
     private void die() {
         alive = false;
         gp.screenShake(40);
 
+        // Drop the necklace — restores king's last memory
         if (!hasDropped) {
             hasDropped = true;
-
             for (int i = 0; i < gp.object.length; i++) {
                 if (gp.object[i] == null) {
                     Necklace_Object n = new Necklace_Object();
-                    n.worldX = worldX;
-                    n.worldY = worldY;
+                    n.worldX = worldX + gp.tileSize;
+                    n.worldY = worldY + gp.tileSize * 2;
                     gp.object[i] = n;
                     break;
                 }
             }
         }
+
+        // Trigger the queen-falls cutscene then ending
+        gp.cutsceneManager.startScene(main.CutsceneManager.Scene.ENDING);
     }
 
+    // -----------------------------------------------
+    // DRAW
+    // -----------------------------------------------
     public void draw(Graphics2D g2) {
         if (!alive) return;
 
-        int screenX = worldX - gp.tileManager.getCameraX();
-        int screenY = worldY - gp.tileManager.getCameraY();
+        int sx   = worldX - gp.tileManager.getCameraX();
+        int sy   = worldY - gp.tileManager.getCameraY();
+        int size = gp.tileSize * 4; // 4×4 tile dragon — same as cutscene
 
-        int size = gp.tileSize * 3;
+        // Frustum cull
+        if (sx + size < 0 || sx > gp.screenWidth ||
+                sy + size < 0 || sy > gp.screenHeight) return;
 
-        BufferedImage frame;
+        // Flash when hit
+        if (invincible && invincibleTimer % 8 < 4)
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
 
-        if (currentPhase == Phase.FIRE_BREATH) {
-            frame = switch (spriteNum) {
-                case 0 -> fire1;
-                case 1 -> fire2;
-                default -> fire3;
-            };
-        } else {
-            frame = switch (spriteNum) {
-                case 0 -> idle1;
-                case 1 -> idle2;
-                default -> idle3;
-            };
+        // Pick frame — fire sprites during FIRE phase, idle sprites otherwise
+        BufferedImage[] frames = (currentPhase == Phase.FIRE && fireActive)
+                ? new BufferedImage[]{ fire1, fire2, fire3 }
+                : new BufferedImage[]{ idle1, idle2, idle3 };
+        BufferedImage frame = frames[spriteNum % 3];
+
+        // Draw queen held above dragon (until death)
+        if (queenSprite != null) {
+            int qx = sx + size / 2 - gp.tileSize / 2;
+            int qy = sy - gp.tileSize - 8;
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+            g2.drawImage(queenSprite, qx, qy, gp.tileSize, gp.tileSize, null);
         }
 
+        // Draw dragon — flip horizontally based on facing direction
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
         if (frame != null) {
-
-            if (fireDirection == 1) {
-                // RIGHT
-                g2.drawImage(frame, screenX, screenY, size, size, null);
+            if (facing == 1) {
+                // Facing right — flip (dragon naturally faces left in the sprite)
+                g2.drawImage(frame, sx + size, sy, -size, size, null);
             } else {
-                // LEFT (flip)
-                g2.drawImage(frame,
-                        screenX + size, screenY,
-                        -size, size,
-                        null);
+                // Facing left — natural orientation
+                g2.drawImage(frame, sx, sy, size, size, null);
             }
-
         } else {
             g2.setColor(Color.RED);
-            g2.fillRect(screenX, screenY, size, size);
+            g2.fillRect(sx, sy, size, size);
         }
 
-        // FIRE VISUAL
+        // Fire projectile
         if (fireActive) {
-            int fx = fireX - gp.player.worldX + gp.player.screenX;
-            int fy = fireY - gp.player.worldY + gp.player.screenY;
-
-            g2.setColor(new Color(255,120,20));
-            g2.fillOval(fx, fy, 30, 30);
+            int fx = (int)(fireX - gp.tileManager.getCameraX());
+            int fy = (int)(fireY - gp.tileManager.getCameraY());
+            // Outer glow
+            g2.setColor(new Color(255, 80, 0, 140));
+            g2.fillOval(fx - 12, fy - 12, 48, 48);
+            // Core
+            g2.setColor(new Color(255, 200, 40));
+            g2.fillOval(fx - 6, fy - 6, 28, 28);
         }
 
-        drawHealthBar(g2, screenX, screenY - 20, size);
+        // Health bar — red, above dragon
+        drawHealthBar(g2, sx, sy - 20, size);
     }
 
-    private void drawHealthBar(Graphics2D g2, int x, int y, int width) {
-        int fill = (int)((double) health / maxHealth * width);
-
-        g2.setColor(new Color(40,40,40));
-        g2.fillRoundRect(x, y, width, 12, 6, 6);
-
-        g2.setColor(new Color(200,50,50));
-        g2.fillRoundRect(x, y, fill, 12, 6, 6);
+    private void drawHealthBar(Graphics2D g2, int x, int y, int w) {
+        int fill = (int)((double) health / maxHealth * w);
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+        g2.setColor(new Color(40, 40, 40, 200)); g2.fillRoundRect(x, y, w, 12, 6, 6);
+        g2.setColor(new Color(200, 50, 50));     g2.fillRoundRect(x, y, fill, 12, 6, 6);
+        g2.setColor(new Color(255,255,255, 50)); g2.drawRoundRect(x, y, w, 12, 6, 6);
     }
 }

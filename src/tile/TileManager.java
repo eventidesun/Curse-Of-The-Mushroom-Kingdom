@@ -32,34 +32,71 @@ public class TileManager {
     }
 
     public void getTileImage() {
+        // -----------------------------------------------
+        // TILE INDEX
+        //  0 = grass          (passable)
+        //  1 = grass_patch    (passable — lighter grass variation)
+        //  2 = grass_dark     (passable — darker grass variation)
+        //  3 = bush           (COLLISION)
+        //  4 = bush_light     (COLLISION — lighter bush)
+        //  5 = stone_path     (passable)
+        //  6 = water          (COLLISION)
+        //  7 = sand           (passable)
+        //  8 = wall           (COLLISION)
+        //  9 = castle_floor   (passable)
+        // -----------------------------------------------
         try {
             tile[0] = new Tile();
-            tile[0].image = ImageIO.read(getClass().getResourceAsStream("/tiles/grass.png"));
+            tile[0].image = ImageIO.read(getClass().getResourceAsStream("/tiles/grass_patch.png"));
 
             tile[1] = new Tile();
-            tile[1].image = ImageIO.read(getClass().getResourceAsStream("/tiles/grass_dark_patch.png"));
+            tile[1].image = loadTileWithFallback("/tiles/grass_dark.png", "/tiles/grass_patch.png");
 
             tile[2] = new Tile();
-            tile[2].image = ImageIO.read(getClass().getResourceAsStream("/tiles/bush.png"));
-            tile[2].collision = true;
+            tile[2].image = loadTileWithFallback("/tiles/grass_dark.png", "/tiles/grass_patch.png");
 
             tile[3] = new Tile();
-            tile[3].image = ImageIO.read(getClass().getResourceAsStream("/tiles/water.png"));
+            tile[3].image = loadTileWithFallback("/tiles/bush.png", "/tiles/grass_patch.png");
             tile[3].collision = true;
 
             tile[4] = new Tile();
-            tile[4].image = ImageIO.read(getClass().getResourceAsStream("/tiles/earth.png"));
+            tile[4].image = loadTileWithFallback("/tiles/bush_light.png", "/tiles/bush.png");
+            tile[4].collision = true;
 
             tile[5] = new Tile();
-            tile[5].image = ImageIO.read(getClass().getResourceAsStream("/tiles/wall.png"));
-            tile[5].collision = true;
+            tile[5].image = loadTileWithFallback("/tiles/stone_path.png", "/tiles/grass_patch.png");
 
             tile[6] = new Tile();
-            tile[6].image = ImageIO.read(getClass().getResourceAsStream("/tiles/stone_path.png"));
-            // 6 = castle floor placeholder — swap to castle_floor.png when art ready
+            tile[6].image = ImageIO.read(getClass().getResourceAsStream("/tiles/water.png"));
+            tile[6].collision = true;
+
+            tile[7] = new Tile();
+            tile[7].image = loadTileWithFallback("/tiles/sand.png", "/tiles/grass_patch.png");
+
+            tile[8] = new Tile();
+            tile[8].image = ImageIO.read(getClass().getResourceAsStream("/tiles/wall.png"));
+            tile[8].collision = true;
+
+            tile[9] = new Tile();
+            tile[9].image = loadTileWithFallback("/tiles/castle_floor.png", "/tiles/stone_path.png");
 
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    // Load primary tile; fall back to secondary if not found
+    private java.awt.image.BufferedImage loadTileWithFallback(String primary, String fallback) {
+        try {
+            InputStream is = getClass().getResourceAsStream(primary);
+            if (is != null) return ImageIO.read(is);
+        } catch (Exception ignored) {}
+        try {
+            System.out.println("Tile not found: " + primary + " — using fallback: " + fallback);
+            return ImageIO.read(getClass().getResourceAsStream(fallback));
+        } catch (Exception e) {
+            System.out.println("Fallback also missing: " + fallback);
+            return null;
         }
     }
 
@@ -102,7 +139,6 @@ public class TileManager {
             br.close();
             System.out.println("Map loaded: " + filePath + " (" + cols + "x" + rows + ")");
 
-            // Spawn cave enemies only when cave loads
             if (filePath.contains("cave")) {
                 gp.assetSetter.setCaveEnemies();
             }
@@ -113,8 +149,7 @@ public class TileManager {
     }
 
     // -----------------------------------------------
-    // SAFE TILE SOLID CHECK — used by CollisionChecker
-    // Never throws ArrayIndexOutOfBounds
+    // SAFE TILE SOLID CHECK
     // -----------------------------------------------
     public boolean isSolid(int col, int row) {
         col = Math.max(0, Math.min(col, gp.maxWorldColCurrent - 1));

@@ -9,11 +9,11 @@ import java.awt.*;
 
 public class GamePanel extends JPanel implements Runnable {
 
-    final int originalTileSize = 16;
-    final int scale = 4;
-    public final int tileSize = originalTileSize * scale;
+    final int originalTileSize    = 16;
+    final int scale               = 4;
+    public final int tileSize     = originalTileSize * scale;
 
-    Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+    Dimension screenSize          = Toolkit.getDefaultToolkit().getScreenSize();
     public final int screenWidth  = (int) screenSize.getWidth();
     public final int screenHeight = (int) screenSize.getHeight();
     public final int maxScreenCol = screenWidth  / tileSize;
@@ -31,20 +31,20 @@ public class GamePanel extends JPanel implements Runnable {
 
     public boolean puzzleAfterDialogue = false;
 
-    private int shakeTimer = 0;
+    private int shakeTimer     = 0;
     private int shakeMagnitude = 0;
 
-    public TileManager tileManager = new TileManager(this);
-    public KeyHandler keyH = new KeyHandler();
-    public Sound music = new Sound();
-    public Sound se = new Sound();
+    public TileManager tileManager           = new TileManager(this);
+    public KeyHandler keyH                   = new KeyHandler();
+    public Sound music                       = new Sound();
+    public Sound se                          = new Sound();
     public CollisionChecker collisionChecker = new CollisionChecker(this);
-    public AssetSetter assetSetter = new AssetSetter(this);
-    public UI ui = new UI(this);
-    public DialogueManager dialogueManager = new DialogueManager(this);
-    public CutsceneManager cutsceneManager = new CutsceneManager(this);
-    public PuzzleScene puzzleScene = new PuzzleScene(this);
-    public EndingScene endingScene = new EndingScene(this);
+    public AssetSetter assetSetter           = new AssetSetter(this);
+    public UI ui                             = new UI(this);
+    public DialogueManager dialogueManager   = new DialogueManager(this);
+    public CutsceneManager cutsceneManager   = new CutsceneManager(this);
+    public PuzzleScene puzzleScene           = new PuzzleScene(this);
+    public EndingScene endingScene           = new EndingScene(this);
 
     Thread gameThread;
 
@@ -68,10 +68,15 @@ public class GamePanel extends JPanel implements Runnable {
         assetSetter.setObject();
         assetSetter.setEnemies();
 
+        // Player position for when overworld starts after cutscene
         player.worldX = 59 * tileSize;
         player.worldY = 12 * tileSize;
 
+        // START CUTSCENE — press F1 to skip during testing
+        // To skip to overworld directly, comment line below and uncomment the next:
         cutsceneManager.startScene(CutsceneManager.Scene.INTRO_CASTLE);
+        // gameState = GameState.OVERWORLD;
+
         playMusic(0);
     }
 
@@ -96,6 +101,7 @@ public class GamePanel extends JPanel implements Runnable {
     public void update() {
         if (shakeTimer > 0) shakeTimer--;
 
+        // F1 — skip to overworld
         if (keyH.debugPressed) {
             keyH.debugPressed = false;
             gameState = GameState.OVERWORLD;
@@ -146,10 +152,18 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void updateEnemies() {
-        for (Goblin g : goblins) if (g != null && g.alive) g.update();
-        for (Troll  t : trolls)  if (t != null && t.alive) t.update();
-        if (giant  != null && giant.alive)  giant.update();
-        if (dragon != null && dragon.alive) dragon.update();
+        for (int i = 0; i < goblins.length; i++) {
+            if (goblins[i] == null) continue;
+            if (goblins[i].alive) goblins[i].update();
+            else goblins[i] = null; // remove dead goblin so it stops drawing
+        }
+        for (int i = 0; i < trolls.length; i++) {
+            if (trolls[i] == null) continue;
+            if (trolls[i].alive) trolls[i].update();
+            else trolls[i] = null; // remove dead troll
+        }
+        if (giant  != null) { if (giant.alive)  giant.update();  else giant  = null; }
+        if (dragon != null) { if (dragon.alive)  dragon.update(); else dragon = null; }
     }
 
     private void checkPlayerAttack() {
@@ -191,7 +205,7 @@ public class GamePanel extends JPanel implements Runnable {
     private void checkDragonDefeated() {
         if (dragon != null && !dragon.alive && player.hasNecklace) {
             if (object[20] == null) {
-                object[20] = new object.Orb_Object();
+                object[20]        = new object.Orb_Object();
                 object[20].worldX = dragon.worldX;
                 object[20].worldY = dragon.worldY - tileSize * 2;
             }
@@ -226,10 +240,10 @@ public class GamePanel extends JPanel implements Runnable {
     private void drawObjects(Graphics2D g2) { for (SuperObject o : object) if (o != null) o.draw(g2, this); }
 
     private void drawEnemies(Graphics2D g2) {
-        for (Goblin g : goblins) if (g != null && g.alive) g.draw(g2);
-        for (Troll  t : trolls)  if (t != null && t.alive) t.draw(g2);
-        if (giant  != null && giant.alive)  giant.draw(g2);
-        if (dragon != null && dragon.alive) dragon.draw(g2);
+        for (Goblin g : goblins) if (g != null) g.draw(g2);
+        for (Troll  t : trolls)  if (t != null) t.draw(g2);
+        if (giant  != null) giant.draw(g2);
+        if (dragon != null) dragon.draw(g2);
     }
 
     public void screenShake(int magnitude) { shakeTimer = 20; shakeMagnitude = magnitude; }

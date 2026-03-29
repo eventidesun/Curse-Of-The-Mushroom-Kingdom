@@ -19,18 +19,19 @@ public class CutsceneManager {
     private int     phaseTimer  = 0;
     private boolean sceneActive = false;
 
-    private BufferedImage kingSprite, queenSprite, dragonSprite, witchSprite;
-    private BufferedImage tileWall, tileFloor, greenSmoke;
+    private BufferedImage kingSprite, queenSprite, witchSprite;
     private BufferedImage dragon1, dragon2, dragon3;
+    private BufferedImage tileWall, tileFloor, greenSmoke;
 
     // Dragon
-    private int     dragonX        = 0;
-    private int     dragonY        = 0;
-    private boolean dragonVisible  = false;
-    private boolean queenVisible   = true;
+    private int     dragonX       = 0;
+    private int     dragonY       = 0;
+    private boolean dragonVisible = false;
+    private boolean queenVisible  = true;
     private boolean dragonCarrying = false;
-    private int     shakeTimer     = 0;
-    private boolean dragonReturning = false;
+    private int     shakeTimer    = 0;
+    private int     dragonFrame   = 0;
+    private int     dragonAnimTimer = 0;
 
     // Poof
     private boolean poofActive = false;
@@ -38,51 +39,35 @@ public class CutsceneManager {
     private int     poofX, poofY;
     private static final int POOF_DURATION = 60;
 
-    // Screen darken — used for within-scene fades
-    private float   darkenAlpha  = 0f;
-    private boolean darkenActive = false;
+    // Screen darken — subtle ambient effect as dragon approaches
+    private float   darkenAlpha = 0f;
 
+    // Dissolve — black fade between scenes
     private enum DissolveState { NONE, FADING_OUT, FADING_IN }
-    private DissolveState dissolveState = DissolveState.NONE;
-    private float         dissolveAlpha = 0f;
+    private DissolveState dissolveState  = DissolveState.NONE;
+    private float         dissolveAlpha  = 0f;
     private static final float DISSOLVE_SPEED = 0.07f;
-    private Runnable      dissolveOnBlack = null; // fires once screen is fully black
+    private Runnable      dissolveOnBlack = null;
 
-    // Transform sequence
-    private int     transformPhase    = 0;
-    private int     transformTimer    = 0;
-    private boolean transformVisible  = false;
-    private boolean isWitchForm       = false;
-    private int     spellBeamX        = 0;
-    private boolean spellActive       = false;
-    private int     kingCurseTimer    = 0;
-    private boolean witchPoofOut      = false;
-    private int     witchPoofTimer    = 0;
-    private boolean didTransformFlash = false;
+    // Dragon curse — after kidnap, dragon returns centre stage
+    // and speaks the curse lines directly
+    private boolean dragonReturned     = false;
+    private int     dragonCentreTimer  = 0;
+    private int     spellBeamX         = 0;
+    private boolean spellActive        = false;
+    private int     kingCurseTimer     = 0;
 
-    // dragon animation
-    private int dragonFrame = 0;
-    private int dragonAnimTimer = 0;
-
-    // Phase 3 king dialogue guard
+    // Phase 3 guard
     private boolean kingConfusedStarted = false;
 
-    // Dream scene guards
+    // Dream guards
     private boolean narratorDone      = false;
     private boolean witchDialogueDone = false;
 
-    private static final String[] TRANSFORM_DIALOGUE_WITCH = {
-            "Pathetic king.",
-            "You could not even protect her.",
-            "Now you will not even remember her.",
-            "*cackles*"
-    };
-
-    private static final String[] TRANSFORM_DIALOGUE_CURSE = {
-            "By the dark magic of forgotten love...",
-            "Let his heart be empty.",
-            "Let her face fade from his mind.",
-            "Let her name dissolve like smoke.",
+    private static final String[] DRAGON_CURSE_LINES = {
+            "Foolish king.",
+            "You never stood a chance.",
+            "And now... you will forget her.",
             "She never existed."
     };
 
@@ -97,7 +82,7 @@ public class CutsceneManager {
     private static final String[] ACT1_CONFUSED = {
             "...",
             "What a wonderful morning!",
-            "Hmm. I should get going",
+            "Hmm. I should get going.",
             "Time to serve the kingdom!"
     };
 
@@ -107,16 +92,15 @@ public class CutsceneManager {
     }
 
     private void loadImages() {
-        kingSprite   = loadImg("/player/boy_down_1.png");
-        queenSprite  = loadImg("/player/boy_down_2.png");
-        dragon1 = loadImg("/enemies/dragon1.png");
-        dragon2 = loadImg("/enemies/dragon2.png");
-        dragon3 = loadImg("/enemies/dragon3.png");
-        dragonSprite = loadImg("/enemies/dragon1.png");
-        witchSprite  = loadImg("/enemies/dragon_fire1.png");
-        tileWall     = loadImg("/tiles/wall.png");
-        tileFloor    = loadImg("/tiles/stone_path.png");
-        greenSmoke   = loadImg("/cutscenes/green_smoke.png");
+        kingSprite  = loadImg("/player/boy_down_1.png");
+        queenSprite = loadImg("/player/boy_down_2.png");
+        witchSprite = loadImg("/enemies/dragon_fire1.png");
+        dragon1     = loadImg("/enemies/dragon1.png");
+        dragon2     = loadImg("/enemies/dragon2.png");
+        dragon3     = loadImg("/enemies/dragon3.png");
+        tileWall    = loadImg("/tiles/wall.png");
+        tileFloor   = loadImg("/tiles/stone_path.png");
+        greenSmoke  = loadImg("/cutscenes/green_smoke.png");
     }
 
     private BufferedImage loadImg(String path) {
@@ -124,10 +108,13 @@ public class CutsceneManager {
         catch (Exception e) { System.out.println("Cutscene img not found: " + path); return null; }
     }
 
+    // -----------------------------------------------
+    // DISSOLVE
+    // -----------------------------------------------
     private void dissolveToNext(Runnable onBlack) {
-        if (dissolveState != DissolveState.NONE) return; // already dissolving
-        dissolveState  = DissolveState.FADING_OUT;
-        dissolveAlpha  = 0f;
+        if (dissolveState != DissolveState.NONE) return;
+        dissolveState   = DissolveState.FADING_OUT;
+        dissolveAlpha   = 0f;
         dissolveOnBlack = onBlack;
     }
 
@@ -138,17 +125,11 @@ public class CutsceneManager {
             if (dissolveAlpha >= 1f) {
                 dissolveAlpha = 1f;
                 dissolveState = DissolveState.FADING_IN;
-                if (dissolveOnBlack != null) {
-                    dissolveOnBlack.run();
-                    dissolveOnBlack = null;
-                }
+                if (dissolveOnBlack != null) { dissolveOnBlack.run(); dissolveOnBlack = null; }
             }
-        } else if (dissolveState == DissolveState.FADING_IN) {
+        } else {
             dissolveAlpha -= DISSOLVE_SPEED;
-            if (dissolveAlpha <= 0f) {
-                dissolveAlpha = 0f;
-                dissolveState = DissolveState.NONE;
-            }
+            if (dissolveAlpha <= 0f) { dissolveAlpha = 0f; dissolveState = DissolveState.NONE; }
         }
     }
 
@@ -164,17 +145,13 @@ public class CutsceneManager {
         poofActive          = false;
         poofTimer           = 0;
         darkenAlpha         = 0f;
-        darkenActive        = false;
         shakeTimer          = 0;
-        transformVisible    = false;
-        isWitchForm         = false;
-        transformPhase      = 0;
-        transformTimer      = 0;
+        dragonFrame         = 0;
+        dragonAnimTimer     = 0;
+        dragonReturned      = false;
+        dragonCentreTimer   = 0;
         spellActive         = false;
         kingCurseTimer      = 0;
-        witchPoofOut        = false;
-        witchPoofTimer      = 0;
-        didTransformFlash   = false;
         kingConfusedStarted = false;
         narratorDone        = false;
         witchDialogueDone   = false;
@@ -220,13 +197,16 @@ public class CutsceneManager {
         if (shakeTimer > 0) shakeTimer--;
         updateDissolve();
 
+        // Dragon wing animation — always ticking when dragon is visible
+        if (dragonVisible) {
+            dragonAnimTimer++;
+            if (dragonAnimTimer > 10) { dragonFrame = (dragonFrame + 1) % 3; dragonAnimTimer = 0; }
+        }
+
         if (poofActive) {
             poofTimer++;
             if (poofTimer >= POOF_DURATION) {
-                poofActive     = false;
-                queenVisible   = false;
-                poofTimer      = 0;
-                dragonCarrying = true;
+                poofActive = false; queenVisible = false; poofTimer = 0; dragonCarrying = true;
             }
         }
 
@@ -239,120 +219,88 @@ public class CutsceneManager {
         }
     }
 
+    // -----------------------------------------------
+    // INTRO — 3 phases
+    // Phase 0: peaceful dialogue
+    // Phase 1: dragon flies in, grabs queen, exits,
+    //          then returns centre and speaks curse lines,
+    //          fires spell at king, then dissolves
+    // Phase 2: king alone, confused
+    // -----------------------------------------------
     private void updateIntro() {
 
-        // wait for dialogue
+        // wait for peaceful dialogue
         if (scenePhase == 0 && !gp.dialogueManager.isActive()
                 && dissolveState == DissolveState.NONE) {
             scenePhase = 1;
+            gp.playSE(6);
         }
 
-        // dragon attack
         if (scenePhase == 1) {
-
-            dragonAnimTimer++;
-            if (dragonAnimTimer > 10) { // speed of flapping
-                dragonFrame = (dragonFrame + 1) % 3;
-                dragonAnimTimer = 0;
-            }
-
             dragonVisible = true;
 
-            if (!dragonCarrying && !poofActive) {
+            // dragon flies in from right, grabs queen
+            if (!dragonCarrying && !poofActive && !dragonReturned) {
                 dragonX -= 10;
-
                 if (darkenAlpha < 0.3f) darkenAlpha += 0.006f;
-
                 int queenX = gp.screenWidth / 2 + 40;
-
                 if (dragonX <= queenX + 60 && queenVisible) {
                     shakeTimer = 40;
-                    poofActive = true;
-                    poofTimer = 0;
-
-                    poofX = queenX;
-                    poofY = gp.screenHeight / 2 - gp.tileSize / 2;
-
-                    gp.playSE(7);
-                    gp.stopMusic();
+                    poofActive = true; poofTimer = 0;
+                    poofX = queenX; poofY = gp.screenHeight / 2 - gp.tileSize / 2;
+                    gp.playSE(7); gp.stopMusic();
                 }
             }
 
-            if (dragonCarrying) {
+            // dragon flies in from right, grabs queen
+            if (!dragonCarrying && !poofActive && !dragonReturned) {
+                dragonX -= 10;
+                if (darkenAlpha < 0.3f) darkenAlpha += 0.006f;
+                int queenX = gp.screenWidth / 2 + 40;
+                if (dragonX <= queenX + 60 && queenVisible) {
+                    shakeTimer = 40;
+                    poofActive = true; poofTimer = 0;
+                    poofX = queenX; poofY = gp.screenHeight / 2 - gp.tileSize / 2;
+                    gp.playSE(7); gp.stopMusic();
+                }
+            }
+
+            // dragon carries queen off screen right, then dissolves and returns centre
+            if (dragonCarrying && !dragonReturned) {
                 dragonX += 12;
-
-                if (dragonX > gp.screenWidth + 200
-                        && dissolveState == DissolveState.NONE) {
-
+                if (dragonX > gp.screenWidth + 200 && dissolveState == DissolveState.NONE) {
                     dissolveToNext(() -> {
-                        dragonVisible    = false;
-                        dragonX          = gp.screenWidth / 2 - gp.tileSize;
-                        dragonY          = gp.screenHeight / 2 - gp.tileSize;
-                        transformPhase   = 0;
-                        transformTimer   = 0;
-                        transformVisible = false;
-                        didTransformFlash = false;
-                        darkenAlpha      = 0f;
-                        scenePhase       = 2;
+                        dragonReturned    = true;
+                        dragonCarrying    = false;
+                        queenVisible      = false;
+                        darkenAlpha       = 0f;
+                        dragonCentreTimer = 0;
+                        dragonX           = gp.screenWidth / 2 + 40;
+                        dragonY           = gp.screenHeight / 2 - gp.tileSize * 2;
+                    });
+                }
+            }
+
+            // Dragon back centre, speaks curse lines then dissolves
+            if (dragonReturned) {
+                dragonCentreTimer++;
+                // Start dialogue after short pause
+                if (dragonCentreTimer == 60 && !gp.dialogueManager.isActive()) {
+                    gp.dialogueManager.startDialogue("dragon", DRAGON_CURSE_LINES);
+                }
+                // Once dialogue done, dissolve to king alone
+                if (dragonCentreTimer > 60 && !gp.dialogueManager.isActive()
+                        && dissolveState == DissolveState.NONE) {
+                    dissolveToNext(() -> {
+                        dragonVisible = false;
+                        scenePhase    = 2;
                     });
                 }
             }
         }
 
-        // transform sequence, phase 2
-        if (scenePhase == 2 && dissolveState != DissolveState.FADING_OUT) {
-            transformTimer++;
-
-            switch (transformPhase) {
-                case 0 -> {
-                    transformVisible = true; isWitchForm = false;
-                    if (transformTimer > 60) {
-                        transformPhase = 1; transformTimer = 0;
-                        gp.dialogueManager.startDialogue("witch", TRANSFORM_DIALOGUE_WITCH);
-                    }
-                }
-                case 1 -> {
-                    if (!gp.dialogueManager.isActive()) {
-                        transformPhase = 2; transformTimer = 0;
-                    }
-                }
-                case 2 -> {
-                    if (transformTimer == 1) { shakeTimer = 50; gp.playSE(7); }
-                    if (transformTimer == 30 && !didTransformFlash) {
-                        isWitchForm = true;
-                        didTransformFlash = true;
-                    }
-                    if (transformTimer > 80) {
-                        transformPhase = 3; transformTimer = 0;
-                        gp.dialogueManager.startDialogue("witch", TRANSFORM_DIALOGUE_CURSE);
-                    }
-                }
-                case 3 -> {
-                    if (!gp.dialogueManager.isActive()) {
-                        transformPhase = 4;
-                        transformTimer = 0;
-                        witchPoofTimer = 0;
-                        witchPoofOut   = true;
-                    }
-                }
-                case 4 -> {
-                    witchPoofTimer++;
-                    if (transformTimer > 60) witchPoofOut = true;
-                    // Once witch is gone, dissolve to king alone scene
-                    if (witchPoofTimer > 60 && dissolveState == DissolveState.NONE) {
-                        dissolveToNext(() -> {
-                            transformVisible = false;
-                            witchPoofOut     = true;
-                            scenePhase       = 3;
-                            transformTimer   = 0;
-                        });
-                    }
-                }
-            }
-        }
-
-        // PHASE 3: king alone, confused — dialogue then dissolve to dream
-        if (scenePhase == 3 && dissolveState == DissolveState.NONE) {
+        // Phase 2: king alone, confused
+        if (scenePhase == 2 && dissolveState == DissolveState.NONE) {
             if (!kingConfusedStarted) {
                 kingConfusedStarted = true;
                 gp.dialogueManager.startDialogue("king", ACT1_CONFUSED);
@@ -366,9 +314,8 @@ public class CutsceneManager {
         }
     }
 
-    // dream
+    // the dream
     private void updateDream() {
-        // Phase 0: narrator — wait for finish
         if (scenePhase == 0 && !narratorDone && !gp.dialogueManager.isActive()
                 && dissolveState == DissolveState.NONE) {
             narratorDone = true;
@@ -381,35 +328,27 @@ public class CutsceneManager {
                     "The answers lie with those who took from her."
             });
         }
-        // Phase 1: witch done — dissolve to overworld
         if (scenePhase == 1 && narratorDone && !witchDialogueDone
                 && !gp.dialogueManager.isActive()
                 && dissolveState == DissolveState.NONE) {
             witchDialogueDone = true;
             dissolveToNext(() -> {
-                sceneActive      = false;
-                gp.gameState     = GamePanel.GameState.OVERWORLD;
+                sceneActive  = false;
+                gp.gameState = GamePanel.GameState.OVERWORLD;
                 gp.playMusic(2);
             });
         }
     }
 
-    // for flashbacks and ending
     private void updateFlashback() {
         if (!gp.dialogueManager.isActive() && dissolveState == DissolveState.NONE) {
-            dissolveToNext(() -> {
-                sceneActive  = false;
-                gp.gameState = GamePanel.GameState.OVERWORLD;
-            });
+            dissolveToNext(() -> { sceneActive = false; gp.gameState = GamePanel.GameState.OVERWORLD; });
         }
     }
 
     private void updateEnding() {
         if (!gp.dialogueManager.isActive() && dissolveState == DissolveState.NONE) {
-            dissolveToNext(() -> {
-                sceneActive  = false;
-                gp.gameState = GamePanel.GameState.ENDING;
-            });
+            dissolveToNext(() -> { sceneActive = false; gp.gameState = GamePanel.GameState.ENDING; });
         }
     }
 
@@ -430,6 +369,7 @@ public class CutsceneManager {
             case ENDING          -> drawEnding(g2);
         }
 
+        // Ambient darken
         if (darkenAlpha > 0f) {
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.min(1f, darkenAlpha)));
             g2.setColor(Color.black);
@@ -437,9 +377,11 @@ public class CutsceneManager {
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
         }
 
+        // Letterbox
         g2.setColor(Color.black);
         g2.fillRect(0, 0, gp.screenWidth, 70);
 
+        // Dialogue on top
         gp.ui.drawDialogueBox(g2);
 
         if (dissolveState != DissolveState.NONE && dissolveAlpha > 0f) {
@@ -450,17 +392,15 @@ public class CutsceneManager {
         }
     }
 
+    // bedroom scene
     private void drawBedroom(Graphics2D g2) {
         int ts = gp.tileSize;
 
-        // Floor
         for (int col=0; col<=gp.screenWidth/ts; col++)
             for (int row=0; row<=gp.screenHeight/ts; row++) {
                 if (tileFloor!=null) g2.drawImage(tileFloor,col*ts,row*ts,ts,ts,null);
                 else { g2.setColor(new Color(160,130,90)); g2.fillRect(col*ts,row*ts,ts,ts); }
             }
-
-        // Walls
         for (int col=0; col<=gp.screenWidth/ts; col++)
             for (int row=0; row<3; row++) {
                 if (tileWall!=null) g2.drawImage(tileWall,col*ts,row*ts,ts,ts,null);
@@ -479,86 +419,29 @@ public class CutsceneManager {
             else { g2.setColor(new Color(200,100,160)); g2.fillRect(qx,qy,ts,ts); }
         }
 
+        // Dragon
         if (dragonVisible) {
-
-            BufferedImage currentDragon = switch (dragonFrame) {
-                case 0 -> dragon1;
-                case 1 -> dragon2;
-                default -> dragon3;
-            };
-
-            int dragonWidth  = ts * 4;   // bigger dragon
-            int dragonHeight = ts * 4;
-
+            int dw = ts * 4, dh = ts * 4;
             int bob = (int)(Math.sin(phaseTimer * 0.2) * 6);
             int drawY = dragonY + bob;
+            BufferedImage frame = switch (dragonFrame) {
+                case 0 -> dragon1; case 1 -> dragon2; default -> dragon3;
+            };
 
-            // Queen being carried
-            if (dragonCarrying && queenSprite != null) {
+            // Queen held above dragon when carrying
+            if (dragonCarrying && queenSprite != null)
                 g2.drawImage(queenSprite, dragonX, drawY - ts, ts, ts, null);
-            }
 
-            if (currentDragon != null) {
-                g2.drawImage(
-                        currentDragon,
-                        dragonX + dragonWidth, drawY,
-                        -dragonWidth, dragonHeight, // flip horizontally
-                        null
-                );
-            } else {
+            if (frame != null)
+                g2.drawImage(frame, dragonX + dw, drawY, -dw, dh, null); // flip horizontally
+            else {
                 g2.setColor(new Color(160,30,30));
-                g2.fillRect(dragonX, drawY, dragonWidth, dragonHeight);
+                g2.fillRect(dragonX, drawY, dw, dh);
             }
         }
 
         // Poof
         if (poofActive) drawPoof(g2, poofX+ts/2, poofY+ts/2, poofTimer, POOF_DURATION);
-
-        // Transform villain
-        if (transformVisible) {
-            int tx=gp.screenWidth/2-ts, ty=gp.screenHeight/2-ts;
-
-            if (scenePhase==2 && transformPhase==2 && transformTimer==30 && didTransformFlash) {
-                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.85f));
-                g2.setColor(Color.white);
-                g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
-                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
-            }
-
-            if (!isWitchForm) {
-
-                BufferedImage currentDragon = switch (dragonFrame) {
-                    case 0 -> dragon1;
-                    case 1 -> dragon2;
-                    default -> dragon3;
-                };
-
-                int dragonWidth  = ts * 4;
-                int dragonHeight = ts * 4;
-
-                if (currentDragon != null) {
-                    g2.drawImage(currentDragon,
-                            tx + dragonWidth, ty,
-                            -dragonWidth, dragonHeight,
-                            null);
-
-                } else {
-                    g2.setColor(Color.RED);
-                    g2.fillRect(tx, ty, dragonWidth, dragonHeight);
-                }
-            } else {
-                if (witchPoofOut) {
-                    float wo = Math.min(1f, witchPoofTimer / 60f);
-                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f-wo));
-                }
-                if (witchSprite!=null) g2.drawImage(witchSprite,tx,ty,ts*2,ts*2,null);
-                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
-                if (witchPoofOut) drawPoof(g2, tx+ts, ty+ts, witchPoofTimer, 60);
-            }
-        }
-
-        // Spell beam
-        if (spellActive) drawSpellBeam(g2, spellBeamX, gp.screenHeight/2-10);
     }
 
     // dream scene
@@ -586,10 +469,7 @@ public class CutsceneManager {
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
         if (greenSmoke != null)
             g2.drawImage(greenSmoke, cx-size/2, cy-size/2, size, size, null);
-        else {
-            g2.setColor(new Color(40,160,40));
-            g2.fillOval(cx-size/2, cy-size/2, size, size);
-        }
+        else { g2.setColor(new Color(40,160,40)); g2.fillOval(cx-size/2, cy-size/2, size, size); }
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
     }
 
@@ -604,21 +484,39 @@ public class CutsceneManager {
         g2.setColor(new Color(200,100,255)); g2.fillOval(x-8,y-8,16,16);
     }
 
-    // -----------------------------------------------
-    // FLASHBACK
-    // -----------------------------------------------
+    // flashback
     private void drawFlashback(Graphics2D g2, String item) {
-        g2.setColor(new Color(180,140,80)); g2.fillRect(0,0,gp.screenWidth,gp.screenHeight);
-        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
-        g2.setColor(new Color(140,90,30)); g2.fillRect(0,0,gp.screenWidth,gp.screenHeight);
-        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
-        int qx=gp.screenWidth/2-32, qy=gp.screenHeight/2-80;
-        if (queenSprite!=null) g2.drawImage(queenSprite,qx,qy,gp.tileSize,gp.tileSize,null);
-        else { g2.setColor(new Color(255,200,220)); g2.fillRect(qx,qy,gp.tileSize,gp.tileSize); }
+        // White base
+        g2.setColor(Color.white);
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+
+        // Subtle warm wash over white
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.12f));
+        g2.setColor(new Color(255, 220, 160));
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
-        g2.setFont(new Font("Courier New",Font.BOLD,18)); g2.setColor(new Color(255,240,180));
-        String lbl = switch(item){case "rose"->"A rose..."; case "ring"->"A ring..."; default->"A crown...";};
-        g2.drawString(lbl, gp.screenWidth/2-g2.getFontMetrics().stringWidth(lbl)/2, qy+gp.tileSize+50);
+
+        // Queen silhouette centre
+        int qx = gp.screenWidth/2 - 32, qy = gp.screenHeight/2 - 80;
+        if (queenSprite != null)
+            g2.drawImage(queenSprite, qx, qy, gp.tileSize, gp.tileSize, null);
+        else {
+            g2.setColor(new Color(200, 100, 160));
+            g2.fillRect(qx, qy, gp.tileSize, gp.tileSize);
+        }
+
+        // Label — dark text readable on white
+        g2.setFont(new Font("Courier New", Font.BOLD, 18));
+        g2.setColor(new Color(80, 55, 30));
+        String lbl = switch (item) {
+            case "rose"  -> "A rose...";
+            case "ring"  -> "A ring...";
+            default      -> "A crown...";
+        };
+        g2.drawString(lbl,
+                gp.screenWidth/2 - g2.getFontMetrics().stringWidth(lbl)/2,
+                qy + gp.tileSize + 50
+        );
     }
 
     private void drawEnding(Graphics2D g2) {
